@@ -71,9 +71,11 @@ behavior and practical validation steps.
 
 ## Runtime Behavior
 
-> Implementation status: only `memory_status` is currently wired into
-> `shortcuts/iris.cherri`. The startup bootstrap and the other memory
-> tools below describe the intended design and are not yet implemented.
+> Implementation status: `memory_read`, `memory_append`, `memory_list`, and
+> `memory_status` are now implemented in `shortcuts/iris.cherri` (append-only,
+> hands-free, fixed-path Files actions; see `docs/memory-system-design.md`).
+> Still pending: `memory_save`/overwrite, `memory_search`, confirmation-gated
+> writes, and the startup bootstrap. All paths/WFKeys need on-device validation.
 
 The memory layer is a fixed set of predeclared tools, not arbitrary file access.
 The agent cannot browse files; every memory operation is routed through a tool.

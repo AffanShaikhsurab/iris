@@ -84,6 +84,47 @@ timeless questions. The Tavily key, like the NVIDIA key, lives only in your
 local copy; `scripts/validate-shortcut.py` fails the build if a real `tvly-` key
 is ever baked into a compiled artifact.
 
+## Optional: Google Tasks (Path A, refresh-token flow)
+
+Iris can read and add Google Tasks. Auth uses a one-time OAuth consent that
+yields a **refresh token**, which Iris exchanges for a short-lived access token
+at the start of each Google request (no interactive browser step at run time).
+
+One-time setup:
+
+1. In **Google Cloud Console**: create a project, enable the **Google Tasks
+   API**, and configure the **OAuth consent screen** (User type *External*; add
+   your own Google account under **Test users**).
+2. Create an **OAuth client ID** (type *Web application* or *Desktop app*) and
+   note the **client ID** and **client secret** (the secret starts with
+   `GOCSPX-`).
+3. Get a **refresh token**: open the **OAuth 2.0 Playground**
+   (developers.google.com/oauthplayground), click the gear → **Use your own
+   OAuth credentials** and paste your client ID/secret, authorize the scope
+   `https://www.googleapis.com/auth/tasks`, then exchange the code for tokens.
+   Copy the **refresh token** (starts with `1//`).
+4. Open Iris in the Shortcuts editor and paste the **client ID**, **client
+   secret**, and **refresh token** into the three Google Text actions near the
+   top, replacing the `google-...-REPLACE-ME` placeholders. Leaving the
+   placeholders keeps the Google tools disabled.
+5. Re-run the **"setup"** primer once so the `oauth2.googleapis.com` and
+   `tasks.googleapis.com` network prompts are granted (the primer also does a
+   token refresh, so a successful setup confirms your credentials work).
+
+Notes and honest limits:
+
+- The token exchange uses Cherri's `formRequest` (Google's token endpoint
+  requires a form-encoded body, not JSON); every Tasks call uses the normal
+  request path with a `Bearer` access token.
+- While your OAuth app is unverified (**Testing** mode), Google may **expire the
+  refresh token after 7 days**, after which you re-mint it via the Playground.
+  Publishing/verifying the app removes this.
+- The keys live only in your local copy of the shortcut;
+  `scripts/validate-shortcut.py` fails the build if a real Google client secret
+  (`GOCSPX-`) or refresh token (`1//...`) is ever baked into a compiled artifact.
+- Gmail (read/draft/send) is not implemented yet; see
+  `docs/google-integrations-research.md`.
+
 ## Permissions: one-time primer for popup-free Siri runs
 
 iOS requires per-action, first-use consent for Calendar, Reminders, Notes,

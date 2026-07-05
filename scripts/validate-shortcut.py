@@ -106,6 +106,21 @@ def main(path: str) -> None:
     if tavily_leak:
         fail(f"{tavily_leak} action(s) appear to contain a real tvly- key. Never bake keys into the source.")
 
+    # Google OAuth secrets must never be baked into the source either.
+    google_secret_leak = sum(
+        1 for a in actions if re.search(r"GOCSPX-[A-Za-z0-9_\-]{10,}", str(a))
+    )
+    if google_secret_leak:
+        fail(f"{google_secret_leak} action(s) appear to contain a real Google client secret (GOCSPX-). Never bake secrets into the source.")
+
+    google_token_leak = sum(
+        1 for a in actions
+        if re.search(r"1//[A-Za-z0-9_\-]{20,}", str(a))
+        and "google-refresh-token-REPLACE-ME" not in str(a)
+    )
+    if google_token_leak:
+        fail(f"{google_token_leak} action(s) appear to contain a real Google refresh token (1//...). Never bake secrets into the source.")
+
     shapes = Counter(tuple(sorted(m)) for m in groups.values())
     print(f"OK: {len(actions)} actions, {len(groups)} control-flow groups, all balanced.")
     print(f"    group shapes: {dict(shapes)}")

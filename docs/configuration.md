@@ -61,6 +61,31 @@ distribute artifacts built from source, which contain the `nvapi-REPLACE-ME`
 placeholder. `scripts/validate-shortcut.py` fails the build if a real-looking
 `nvapi-` key appears in the compiled shortcut.
 
+## Local personal builds: bake in your keys with `.env.local`
+
+Re-importing a rebuilt shortcut normally means re-pasting every key in the
+editor. To skip that on your own device, put your credentials in a gitignored
+`.env.local` file and the build injects them automatically:
+
+1. `cp .env.local.example .env.local`
+2. Fill in your real values: `NIM_API_KEY` (required); `TAVILY_KEY`,
+   `NIM_MODEL_ID`, and the three `GOOGLE_*` values (optional).
+3. Build normally (`bash scripts/build-shortcuts.sh`). When `.env.local` exists,
+   the build replaces the `...-REPLACE-ME` placeholders with your values in a
+   **throwaway copy** of the source (the committed source is never touched), so
+   `dist/Iris.shortcut` works the moment you import it — no manual pasting.
+
+Safety model:
+
+- `.env.local` is gitignored and is **never committed or pushed**; the committed
+  source always keeps the placeholders.
+- CI and any build **without** `.env.local` produce the safe placeholder
+  version. **Never distribute a build made with a filled `.env.local`**, and do
+  not run `scripts/validate-shortcut.py` on one — it fails by design when real
+  keys are present.
+- You still run the one-time **"setup"** primer after each import to grant iOS
+  permissions; only the credentials are auto-filled, not the permission grants.
+
 ## Optional: Web Search (Tavily)
 
 By default the agent answers from the model's own knowledge, so it cannot know

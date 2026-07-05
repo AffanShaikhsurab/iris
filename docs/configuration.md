@@ -1,0 +1,197 @@
+# Configuration
+
+Agent Router intentionally does not commit secrets.
+
+## Default Backend: NVIDIA NIM (build.nvidia.com)
+
+The planner is a hosted NVIDIA NIM model called through the OpenAI-compatible
+endpoint:
+
+```text
+POST https://integrate.api.nvidia.com/v1/chat/completions
+Authorization: Bearer nvapi-...
+```
+
+Setup:
+
+1. Sign in at `build.nvidia.com` (NVIDIA Developer account; phone verification
+   required) and generate a personal key at `build.nvidia.com/settings/api-keys`.
+   The key starts with `nvapi-` and is shown only once.
+2. Import the shortcut, then open it in the Shortcuts editor and paste the key
+   into the **first Text action** at the top, replacing `nvapi-REPLACE-ME`
+   (the S-GPT pattern). The key lives only inside the local copy of the
+   shortcut. If the shortcut is run before this is done, it speaks these setup
+   instructions and stops instead of failing.
+3. The second Text action holds the model id. The default is
+   `meta/llama-3.1-8b-instruct` — chosen for latency, not capability. iOS
+   gives `Get Contents of URL` a fixed, non-configurable timeout around 25
+   seconds (and the Siri voice path is less patient), while NIM's free tier
+   frequently serves popular big models slowly under load (30+ second
+   responses, occasional 504s). A slow call surfaces as "the request timed
+   out" in the app and "Something went wrong" from Siri.
+
+Model selection rules (any `provider/model-name` id from the catalog works):
+
+- Prefer small dense instruct models (`meta/llama-3.1-8b-instruct`,
+  `mistralai/mistral-7b-instruct-v0.3`).
+- Big models (`meta/llama-3.3-70b-instruct`, `openai/gpt-oss-120b`) give
+  better answers but risk timeouts at peak hours — try them, and switch back
+  if runs start dying.
+- NEVER use reasoning/thinking models (`nvidia/nemotron-3-nano*`,
+  `deepseek-ai/*`, anything `*-thinking`): NIM hangs on some of them unless a
+  `chat_template_kwargs` field is sent, and thinking output breaks the
+  flat-JSON route contract and the timing budget.
+- Avoid just-launched models; free-tier capacity for them is overloaded for
+  weeks after launch.
+
+Do NOT move the key back into import questions (Cherri `#question`): since
+iOS 18.5 the Shortcuts Setup step silently fails to save the entered value
+into the bound action, leaving the key empty. This surfaced as "the key is
+not taking" at import and Siri's generic "Something went wrong" at runtime.
+Whitespace is stripped from both Text values at runtime, so a stray newline
+from pasting cannot corrupt the Authorization header.
+
+The free tier is rate-limited (about 40 requests per minute per key, shared
+across models, subject to change) rather than credit-based. One Agent Router
+conversation uses roughly 2-10 requests.
+
+Do not commit a real API key to this repository. Do not upload generated or
+signed artifacts after answering the setup questions with a real key; only
+distribute artifacts built from source, which contain the `nvapi-REPLACE-ME`
+placeholder. `scripts/validate-shortcut.py` fails the build if a real-looking
+`nvapi-` key appears in the compiled shortcut.
+
+## Optional: Web Search (Tavily)
+
+By default the agent answers from the model's own knowledge, so it cannot know
+anything current ("when is the next FIFA match", live news, prices). Add a free
+Tavily key to give it real internet search:
+
+1. Sign up at `app.tavily.com` (free tier: 1,000 searches/month, **no credit
+   card**) and copy the key (starts with `tvly-`).
+2. Open the shortcut in the editor and paste it into the **third Text action**
+   at the top (`tvly-REPLACE-ME`). Leaving the placeholder simply disables web
+   search — everything else still works.
+3. Re-run the "setup" primer once so the `api.tavily.com` network prompt is
+   granted (see below).
+
+How it works: the `web_search` tool sends the query to
+`POST https://api.tavily.com/search` with `include_answer` and reads Tavily's
+synthesized `answer` plus source snippets, feeds them back to the agent, and the
+agent speaks a summarized answer. The model is instructed to use `web_search`
+for real-time/recent/changing facts and `answer_search` (its own knowledge) for
+timeless questions. The Tavily key, like the NVIDIA key, lives only in your
+local copy; `scripts/validate-shortcut.py` fails the build if a real `tvly-` key
+is ever baked into a compiled artifact.
+
+## Permissions: one-time primer for popup-free Siri runs
+
+iOS requires per-action, first-use consent for Calendar, Reminders, Notes,
+Location, Weather, Files, and each network host. There is **no way to bulk-grant
+or pre-authorize** these — not in code, not in Settings, not via MDM (verified
+2026-07-05). Consent is stored per-shortcut and cannot be scripted away; Apple
+designed it that way for privacy. A mid-run popup also drops Siri out of voice
+mode and shows the result on screen instead of speaking it.
+
+The workaround is to trigger every prompt once, in a single manual run, so
+hands-free Siri never prompts again. The shortcut has a built-in **permission
+primer** for this:
+
+1. After importing the final build and pasting your key, run Agent Router
+   **manually from the Shortcuts app, on an unlocked phone** (not via Siri).
+2. Answer the first prompt with **"setup"** (or "grant permissions").
+3. Tap **Always Allow** — not "Allow Once" — on every dialog that appears
+   (network, Calendar, Reminders, Location, Weather, Files, Notes). The primer
+   runs one read action per permission (plus a tiny network ping and one
+   labeled setup note you can delete).
+4. For background/locked Siri use, also set Settings → Privacy & Security →
+   Location Services → Shortcuts to **Always**.
+
+After this, normal voice requests run without popups. Notes:
+
+- Grants are **per-shortcut** and reset when the shortcut is re-imported or
+  recompiled — re-run "setup" after every re-import. A separate helper shortcut
+  cannot grant permissions to this one.
+- Calendar/Reminders read actions request **Full Access**, which also covers the
+  create/add actions, so one setup pass is enough.
+- The primer only runs when the request begins with a setup phrase; normal
+  requests like "set a reminder" or "access my calendar" are unaffected.
+
+## Invocation: launching without saying "Agent Router"
+
+By default you launch the shortcut by its name: "Hey Siri, Agent Router". The
+shortcut's name IS its Siri trigger phrase (set by `#define name Agent Router`
+in `shortcuts/agent_router.cherri`).
+
+iOS does not let a third-party shortcut replace Siri's built-in handling of
+general "Hey Siri ..." questions, and the "Hey Siri" wake word itself cannot be
+changed (verified 2026-07). So there is no way to make a bare "Hey Siri, what's
+the weather" route into Agent Router. What you CAN do:
+
+1. **Vocal Shortcuts (best "just say a word" option).** Settings →
+   Accessibility → Vocal Shortcuts → Set Up Vocal Shortcuts, pick Agent Router,
+   and record a short custom phrase (for example "assistant" or "computer").
+   After that the phrase runs Agent Router on-device **without saying "Siri" at
+   all**. It is the closest thing to a custom wake word.
+2. **Rename to a shorter phrase.** Change `#define name Agent Router` to a short,
+   natural word (for example `#define name Assistant`), rebuild, and re-import.
+   Then "Hey Siri, Assistant" is all you say. Keep it distinct from Apple's own
+   command words so Siri does not intercept it. Re-run the "setup" primer after
+   re-import, because permission grants reset on re-import.
+3. **No-voice launch.** Bind the shortcut to the **Action Button** (iPhone 15
+   Pro and later), a **Back Tap** (Settings → Accessibility → Touch → Back Tap),
+   or add it to the **Home Screen / Lock Screen / Today View / Control Center**.
+   Any of these opens Agent Router directly, and it immediately asks "What
+   should Agent Router do?" so you just talk.
+
+Whichever entry point you use, the conversation model is unchanged: Agent Router
+asks, listens, answers, and offers "Anything else?" until you say a stop word.
+
+## Previous Backend: ChatGPT app App Intent
+
+Earlier versions used the ChatGPT iOS app's own `com.openai.chat.AskIntent`
+action (no API key, but requires the app installed and signed in, and each
+call risks the app's helper/session failures). The device-validated action
+shape is preserved in `shortcut-syntax-reference.md` and `notes.md` if a
+no-key backend is wanted again.
+
+## Speech Output
+
+All spoken output goes through Siri itself: `Ask for Input` prompts are read
+aloud by Siri and answered by dictation, and answers are embedded in the next
+prompt. There is no custom text-to-speech in the shortcut. See
+`docs/shortcut-runtime-flow.md` for the conversation model.
+
+## OKF Memory Folder
+
+Agent Router expects an optional OKF-style memory folder at:
+
+```text
+Shortcuts/AgentRouterOKF/
+```
+
+The first files to create on the phone are:
+
+```text
+index.md
+profile.md
+preferences.md
+log.md
+```
+
+The Shortcut currently reads fixed paths such as
+`/Shortcuts/AgentRouterOKF/index.md` and appends confirmed memory writes to
+`/Shortcuts/AgentRouterOKF/log.md`. These paths are experimental until validated
+on a target iPhone because iOS Files/iCloud Drive path behavior can vary.
+
+See `docs/okf-knowledge-base.md` for the concept format and privacy rules.
+
+## Privacy Warning
+
+The default ChatGPT path sends the user's typed, dictated, shared, or
+clipboard-provided request to ChatGPT. API mode would send the same kind of data
+to the configured model provider. Users should not route sensitive personal data
+unless they understand the provider's privacy terms.
+
+If OKF memory is enabled, any retrieved memory snippet included in the prompt is
+also sent to ChatGPT. Keep memory entries concise and avoid sensitive data.

@@ -1,0 +1,304 @@
+[
+  {
+    "index": 1,
+    "identifier": "is.workflow.actions.sendmessage",
+    "params": {
+      "IntentAppDefinition": "{'BundleIdentifier': 'com.google.Gmail', 'Name': 'Gmail', 'TeamIdentifier': 'EQHXZ8M8AV'}",
+      "UUID": "'4B37A03C-EC56-4CB6-B677-958834D1A2AB'"
+    }
+  },
+  {
+    "index": 2,
+    "identifier": "com.google.Maps.RestaurantsIntent",
+    "params": {
+      "UUID": "'3126D4F4-0AF2-40D2-A77A-61CE9E20AC30'",
+      "OpenWhenRun": "False",
+      "AppIntentDescriptor": "{'TeamIdentifier': 'EQHXZ8M8AV', 'BundleIdentifier': 'com.google.Maps', 'Name': 'Google Maps', 'AppIntentIdentifier': 'RestaurantsIntent'}"
+    }
+  },
+  {
+    "index": 3,
+    "identifier": "com.google.Maps.SearchIntent",
+    "params": {
+      "UUID": "'840F5856-9CDE-415F-B639-488278682F90'",
+      "AppIntentDescriptor": "{'TeamIdentifier': 'EQHXZ8M8AV', 'BundleIdentifier': 'com.google.Maps', 'Name': 'Google Maps', 'AppIntentIdentifier': 'SearchIntent'}"
+    }
+  },
+  {
+    "index": 4,
+    "identifier": "com.apple.MobileSMS.MessageEntity",
+    "params": {
+      "AppIntentDescriptor": "{'TeamIdentifier': '0000000000', 'BundleIdentifier': 'com.apple.MobileSMS', 'Name': 'Messages', 'AppIntentIdentifier': 'MessageEntity', 'ActionRequiresAppInstallation': True}",
+      "UUID": "'0FA16659-00BC-4277-8987-92968CEC0380'"
+    }
+  },
+  {
+    "index": 5,
+    "identifier": "is.workflow.actions.sendmessage",
+    "params": {
+      "IntentAppDefinition": "{'BundleIdentifier': 'com.apple.MobileSMS'}",
+      "WFSendMessageContent": "{'Value': {'string': '￼', 'attachmentsByRange': {'{0, 1}': {'OutputUUID': '0FA16659-00BC-4277-8987-92968CEC0380', 'Type': 'ActionOutput', 'OutputName': 'Message'}}}, 'WFSerializationType': 'WFTextTokenString'}",
+      "AppIntentDescriptor": "{'TeamIdentifier': '0000000000', 'BundleIdentifier': 'com.apple.MobileSMS', 'Name': 'Messages', 'AppIntentIdentifier': 'SendMessageIntent'}",
+      "UUID": "'1ED8B406-97E9-45BC-BBB6-3D5A48C3EA0B'"
+    }
+  },
+  {
+    "index": 6,
+    "identifier": "net.whatsapp.WhatsApp.send",
+    "params": {
+      "UUID": "'70CE3E05-C581-41C7-B07D-B45390FAD267'"
+    }
+  },
+  {
+    "index": 7,
+    "identifier": "com.apple.reminders.TTRSearchRemindersAppIntent",
+    "params": {
+      "UUID": "'29E10ECA-AFE9-4DCB-AD51-215F78557B57'",
+      "AppIntentDescriptor": "{'TeamIdentifier': '0000000000', 'BundleIdentifier': 'com.apple.reminders', 'Name': 'Reminders', 'AppIntentIdentifier': 'TTRSearchRemindersAppIntent'}"
+    }
+  },
+  {
+    "index": 8,
+    "identifier": "com.apple.reminders.TTRCreateListAppIntent",
+    "params": {
+      "AppIntentDescriptor": "{'TeamIdentifier': '0000000000', 'BundleIdentifier': 'com.apple.reminders', 'Name': 'Reminders', 'AppIntentIdentifier': 'TTRCreateListAppIntent'}",
+      "UUID": "'428B170A-277F-4141-A184-F0F48900E0A5'"
+    }
+  },
+  {
+    "index": 9,
+    "identifier": "is.workflow.actions.properties.reminders",
+    "params": {
+      "UUID": "'0B933D16-9F84-4B39-B190-A1B8E9375B7F'"
+    }
+  },
+  {
+    "index": 10,
+    "identifier": "is.workflow.actions.getupcomingreminders",
+    "params": {
+      "UUID": "'27C66446-302F-4778-A91D-8597660E1546'"
+    }
+  },
+  {
+    "index": 11,
+    "identifier": "com.apple.reminders.TTRSearchRemindersAppIntent",
+    "params": {
+      "UUID": "'1B20368E-F211-40C6-8777-05D1C95116BD'",
+      "AppIntentDescriptor": "{'TeamIdentifier': '0000000000', 'BundleIdentifier': 'com.apple.reminders', 'Name': 'Reminders', 'AppIntentIdentifier': 'TTRSearchRemindersAppIntent'}"
+    }
+  },
+  {
+    "index": 12,
+    "identifier": "is.workflow.actions.filter.reminders",
+    "params": {
+      "UUID": "'5BF82A78-48D3-443C-9CE8-02ECF96D1FA9'"
+    }
+  },
+  {
+    "index": 13,
+    "identifier": "net.whatsapp.WhatsApp.OpenMetaAIIntent",
+    "params": {
+      "UUID": "'77A7133B-1793-4E69-9E0E-B0A5D4D4E8ED'",
+      "AppIntentDescriptor": "{'TeamIdentifier': '57T9237FN3', 'BundleIdentifier': 'net.whatsapp.WhatsApp', 'Name': '\\u200eWhatsApp', 'AppIntentIdentifier': 'OpenMetaAIIntent'}"
+    }
+  },
+  {
+    "index": 14,
+    "identifier": "net.whatsapp.WhatsApp.EndMetaAICallIntent",
+    "params": {
+      "UUID": "'B8D96256-C296-4F89-8AB1-A653B653D6B6'",
+      "AppIntentDescriptor": "{'TeamIdentifier': '57T9237FN3', 'BundleIdentifier': 'net.whatsapp.WhatsApp', 'Name': '\\u200eWhatsApp', 'AppIntentIdentifier': 'EndMetaAICallIntent'}"
+    }
+  },
+  {
+    "index": 15,
+    "identifier": "is.workflow.actions.weather.currentconditions",
+    "params": {
+      "UUID": "'BE909C7B-455C-402B-BD20-5698689EA65C'"
+    }
+  },
+  {
+    "index": 16,
+    "identifier": "is.workflow.actions.weather.forecast",
+    "params": {
+      "UUID": "'5D9CE564-52F1-4CEE-A6CD-38B29EA9FBE4'"
+    }
+  },
+  {
+    "index": 17,
+    "identifier": "is.workflow.actions.filter.notes",
+    "params": {
+      "AppIntentDescriptor": "{'TeamIdentifier': '0000000000', 'BundleIdentifier': 'com.apple.mobilenotes', 'Name': 'Notes', 'AppIntentIdentifier': 'NoteEntity', 'ActionRequiresAppInstallation': True}",
+      "UUID": "'92D2A4F7-5991-4891-BC67-155881D173A7'"
+    }
+  },
+  {
+    "index": 18,
+    "identifier": "is.workflow.actions.appendnote",
+    "params": {
+      "AppIntentDescriptor": "{'TeamIdentifier': '0000000000', 'BundleIdentifier': 'com.apple.mobilenotes', 'Name': 'Notes', 'AppIntentIdentifier': 'AppendToNoteLinkAction'}",
+      "WFInput": "{'Value': {'string': '￼', 'attachmentsByRange': {'{0, 1}': {'OutputUUID': '92D2A4F7-5991-4891-BC67-155881D173A7', 'Type': 'ActionOutput', 'OutputName': 'Note'}}}, 'WFSerializationType': 'WFTextTokenString'}",
+      "UUID": "'2FE5C415-199B-4890-94AA-BA7EB1989A20'"
+    }
+  },
+  {
+    "index": 19,
+    "identifier": "com.apple.mobileslideshow.PhotosSearchAssistantIntent",
+    "params": {
+      "UUID": "'ADFFC9D2-7B43-4940-AC0C-C43F3799906B'",
+      "AppIntentDescriptor": "{'TeamIdentifier': '0000000000', 'BundleIdentifier': 'com.apple.mobileslideshow', 'Name': 'Photos', 'AppIntentIdentifier': 'PhotosSearchAssistantIntent'}"
+    }
+  },
+  {
+    "index": 20,
+    "identifier": "is.workflow.actions.searchweb",
+    "params": {}
+  },
+  {
+    "index": 21,
+    "identifier": "is.workflow.actions.runjavascriptonwebpage",
+    "params": {
+      "UUID": "'699B0BA6-B96B-4BA6-BE09-2F4961E8DBAB'"
+    }
+  },
+  {
+    "index": 22,
+    "identifier": "is.workflow.actions.getwebpagecontents",
+    "params": {
+      "WFInput": "{'Value': {'string': '￼', 'attachmentsByRange': {'{0, 1}': {'OutputUUID': '699B0BA6-B96B-4BA6-BE09-2F4961E8DBAB', 'Type': 'ActionOutput', 'OutputName': 'JavaScript Result'}}}, 'WFSerializationType': 'WFTextTokenString'}",
+      "UUID": "'85C23723-35B1-46CD-8EF2-B5C08C06E747'"
+    }
+  },
+  {
+    "index": 23,
+    "identifier": "com.google.chrome.ios.SearchInChromeIntent",
+    "params": {
+      "searchPhrase": "{'Value': {'string': '￼', 'attachmentsByRange': {'{0, 1}': {'OutputUUID': '85C23723-35B1-46CD-8EF2-B5C08C06E747', 'Type': 'ActionOutput', 'OutputName': 'Contents of Web Page'}}}, 'WFSerializationType': 'WFTextTokenString'}",
+      "UUID": "'6F568ABF-5C7E-43F5-B6D8-988A7050969B'"
+    }
+  },
+  {
+    "index": 24,
+    "identifier": "com.google.chrome.ios.OpenLensIntent",
+    "params": {
+      "UUID": "'DA50F5C6-FAF1-489D-B56C-9239DB4258F1'"
+    }
+  },
+  {
+    "index": 25,
+    "identifier": "com.google.chrome.ios.OpenLensIntent",
+    "params": {
+      "UUID": "'4F5D8E3D-2459-41DF-9BC0-604A83BCC367'"
+    }
+  },
+  {
+    "index": 26,
+    "identifier": "is.workflow.actions.file.getfoldercontents",
+    "params": {
+      "UUID": "'883D1486-688A-46CA-878D-61DD34745AF9'"
+    }
+  },
+  {
+    "index": 27,
+    "identifier": "is.workflow.actions.file.getfoldercontents",
+    "params": {
+      "WFFolder": "{'Value': {'OutputUUID': '883D1486-688A-46CA-878D-61DD34745AF9', 'Type': 'ActionOutput', 'OutputName': 'Folder Contents'}, 'WFSerializationType': 'WFTextTokenAttachment'}",
+      "UUID": "'8C93F206-8106-4457-8976-96D631A327AE'"
+    }
+  },
+  {
+    "index": 28,
+    "identifier": "is.workflow.actions.getdevicedetails",
+    "params": {
+      "UUID": "'CF9C831D-9E30-4AE2-B8A4-9428CA506785'"
+    }
+  },
+  {
+    "index": 29,
+    "identifier": "is.workflow.actions.getcurrentlocation",
+    "params": {
+      "UUID": "'9BC244C0-B9D2-4ABE-AC85-7BF4020340B6'"
+    }
+  },
+  {
+    "index": 30,
+    "identifier": "is.workflow.actions.downloadurl",
+    "params": {
+      "UUID": "'91BD3A3E-367F-4705-B113-1B92C3BD76FD'"
+    }
+  },
+  {
+    "index": 31,
+    "identifier": "is.workflow.actions.repeat.count",
+    "params": {
+      "GroupingIdentifier": "'6651F8FD-D89E-42B2-8D1E-FEEFE1E3CD26'",
+      "WFControlFlowMode": "0"
+    }
+  },
+  {
+    "index": 32,
+    "identifier": "is.workflow.actions.repeat.count",
+    "params": {
+      "WFControlFlowMode": "2",
+      "GroupingIdentifier": "'6651F8FD-D89E-42B2-8D1E-FEEFE1E3CD26'",
+      "UUID": "'7224ED8D-9B0F-4808-AC12-8E30286F4863'"
+    }
+  },
+  {
+    "index": 33,
+    "identifier": "is.workflow.actions.getmyworkflows",
+    "params": {
+      "UUID": "'85A14EE9-A12D-4BF7-AF6D-9208B88764B9'"
+    }
+  },
+  {
+    "index": 34,
+    "identifier": "is.workflow.actions.runworkflow",
+    "params": {
+      "WFInput": "{'Value': {'OutputUUID': '85A14EE9-A12D-4BF7-AF6D-9208B88764B9', 'Type': 'ActionOutput', 'OutputName': 'My Shortcuts'}, 'WFSerializationType': 'WFTextTokenAttachment'}",
+      "UUID": "'752CB80A-760E-4E7D-90BA-00C930FD113C'"
+    }
+  },
+  {
+    "index": 35,
+    "identifier": "is.workflow.actions.runsshscript",
+    "params": {
+      "WFInput": "{'Value': {'OutputUUID': '752CB80A-760E-4E7D-90BA-00C930FD113C', 'Type': 'ActionOutput', 'OutputName': 'Shortcut Result'}, 'WFSerializationType': 'WFTextTokenAttachment'}",
+      "UUID": "'B39AC60E-7B6A-4AF9-8724-BFAA4B3C89E0'"
+    }
+  },
+  {
+    "index": 36,
+    "identifier": "is.workflow.actions.openxcallbackurl",
+    "params": {
+      "WFXCallbackURL": "{'Value': {'string': '￼', 'attachmentsByRange': {'{0, 1}': {'OutputUUID': 'B39AC60E-7B6A-4AF9-8724-BFAA4B3C89E0', 'Type': 'ActionOutput', 'OutputName': 'Shell Script Result'}}}, 'WFSerializationType': 'WFTextTokenString'}",
+      "UUID": "'E10054EC-EB22-4342-81F7-D507A50C6424'"
+    }
+  },
+  {
+    "index": 37,
+    "identifier": "is.workflow.actions.list",
+    "params": {
+      "UUID": "'78A694BE-D493-4D2F-B4B7-FC1B9785ED2A'"
+    }
+  },
+  {
+    "index": 38,
+    "identifier": "is.workflow.actions.setstoredcontent",
+    "params": {
+      "WFInput": "{'Value': {'string': '￼', 'attachmentsByRange': {'{0, 1}': {'OutputUUID': '78A694BE-D493-4D2F-B4B7-FC1B9785ED2A', 'Type': 'ActionOutput', 'OutputName': 'List'}}}, 'WFSerializationType': 'WFTextTokenString'}"
+    }
+  },
+  {
+    "index": 39,
+    "identifier": "is.workflow.actions.getstoredcontent",
+    "params": {
+      "UUID": "'6BAF15DD-F131-4DE0-B5A2-806B7AA32715'"
+    }
+  },
+  {
+    "index": 40,
+    "identifier": "is.workflow.actions.deletestoredcontent",
+    "params": {}
+  }
+]

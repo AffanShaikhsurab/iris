@@ -1,0 +1,13 @@
+# Normalize line endings. Keep text files LF in the repo so Linux/macOS CI and
+# the bash build scripts work regardless of the OS used to edit them.
+* text=auto eol=lf
+
+# Cherri source and shell scripts are LF-sensitive on the CI runners.
+*.cherri text eol=lf
+*.sh     text eol=lf
+*.py     text eol=lf
+*.yml    text eol=lf
+
+# Binary artifacts must never receive line-ending conversion.
+*.shortcut binary
+*.plist    binary

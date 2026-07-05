@@ -1,0 +1,11 @@
+dist/
+build/
+*.signed.shortcut
+*.plist
+*_processed.cherri
+__pycache__/
+.pytest_cache/
+tmp/
+
+# Compiled shortcut artifacts belong in dist/; keep shortcuts/ source-only.
+shortcuts/*.shortcut

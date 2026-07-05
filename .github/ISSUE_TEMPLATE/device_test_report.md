@@ -15,7 +15,7 @@ labels: testing, device
 ## Import Result
 
 - [ ] Signed shortcut imported.
-- [ ] Siri can start "Agent Router".
+- [ ] Siri can start "Iris".
 - [ ] API key placeholder was replaced.
 
 ## Route Results

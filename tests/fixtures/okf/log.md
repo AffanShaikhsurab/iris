@@ -1,6 +1,6 @@
 ---
 type: Log
-title: Agent Router OKF Fixture Log
+title: Iris OKF Fixture Log
 description: Append-only fixture log for dry-run memory tests.
 tags:
   - log

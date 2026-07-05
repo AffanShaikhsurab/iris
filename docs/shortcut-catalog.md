@@ -1,7 +1,7 @@
 # Shortcut Catalog Candidates
 
 This file curates the best reusable patterns from Matthew Cassinelli-style
-shortcut catalogs for Agent Router. The goal is not to copy every shortcut. The
+shortcut catalogs for Iris. The goal is not to copy every shortcut. The
 goal is to identify high-value routes that are common, safe, and realistic to
 build with Apple Shortcuts.
 
@@ -36,7 +36,7 @@ build with Apple Shortcuts.
 These are catalog shortcuts like Search Google, YouTube Search, Search Reddit,
 Search Amazon, Search X, Search Bluesky, Search Fandango, and Open Perplexity.
 
-Agent Router should implement this as one generic route:
+Iris should implement this as one generic route:
 
 ```json
 {
@@ -55,7 +55,7 @@ Catalog examples include Open Notion AI, Open Perplexity, Open Google Lens,
 Open Health Summary, Open App Store Search, Open YouTube Subscriptions, Open
 Reminders Today, and Open Calendar/Fantastical views.
 
-Agent Router should implement this as a registry:
+Iris should implement this as a registry:
 
 ```json
 {
@@ -72,7 +72,7 @@ added.
 Catalog examples include Create voice memo, Activate Monologue, Start Recording
 Note, Log journal, Create note, Email myself, and Add reminder.
 
-Best Agent Router route family:
+Best Iris route family:
 
 - `create_note`
 - `create_reminder`
@@ -84,7 +84,7 @@ Best Agent Router route family:
 Catalog examples include Join my next meeting, Show today's agenda, Show
 tomorrow's schedule, Change calendar set, and Leave for theater.
 
-Best Agent Router route family:
+Best Iris route family:
 
 - `calendar_lookup`
 - `join_next_meeting`
@@ -124,7 +124,7 @@ separate route pack after device testing.
 
 ## Recommended Next Route Pack
 
-After the current Agent Router imports and runs successfully on iPhone, add only
+After the current Iris imports and runs successfully on iPhone, add only
 these routes next:
 
 1. `open_search`: Google, YouTube, Perplexity, X, Reddit.

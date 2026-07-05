@@ -1,16 +1,16 @@
 ---
 type: Project
-title: Shortcut Agent Router
+title: Iris
 description: Siri replacement experiment using ChatGPT App Intent and predeclared Apple Shortcuts tools.
 tags:
-  - agent-router
+  - iris
   - siri
   - shortcuts
   - memory
 timestamp: 2026-07-04T17:19:00+05:30
 ---
 
-# Shortcut Agent Router
+# Iris
 
 ## Goal
 

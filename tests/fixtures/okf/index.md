@@ -1,15 +1,15 @@
 ---
 type: Index
-title: Agent Router OKF Fixture Bundle
+title: Iris OKF Fixture Bundle
 description: Test knowledge bundle used by the dry-run agent loop harness.
 tags:
-  - agent-router
+  - iris
   - okf
   - fixture
 timestamp: 2026-07-04T17:19:00+05:30
 ---
 
-# Agent Router OKF Fixture Bundle
+# Iris OKF Fixture Bundle
 
 This bundle is a safe local fixture for harness tests. It models the phone-local
 OKF folder without requiring iOS Files access.
@@ -17,5 +17,5 @@ OKF folder without requiring iOS Files access.
 ## Concepts
 
 - [User preferences](preferences/user-preferences.md)
-- [Agent Router project](projects/agent-router.md)
+- [Iris project](projects/iris.md)
 - [Loop reliability fact](facts/loop-reliability.md)

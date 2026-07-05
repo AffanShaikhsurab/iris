@@ -1,10 +1,10 @@
 # OKF Knowledge Base
 
-Agent Router uses a phone-local OKF-style knowledge base to give the agent
+Iris uses a phone-local OKF-style knowledge base to give the agent
 durable context without pretending it has Apple Intelligence-level private app
 access.
 
-OKF is a directory of Markdown concept files with YAML frontmatter. Agent Router
+OKF is a directory of Markdown concept files with YAML frontmatter. Iris
 uses the same simple shape: each concept is readable by humans, retrievable by
 the Shortcut, and safe to pass to the model only when relevant.
 
@@ -13,7 +13,7 @@ the Shortcut, and safe to pass to the model only when relevant.
 The intended phone folder is:
 
 ```text
-Shortcuts/AgentRouterOKF/
+Shortcuts/IrisOKF/
   index.md
   log.md
   profile.md
@@ -27,10 +27,10 @@ Shortcuts/AgentRouterOKF/
 The current Shortcut source uses fixed paths:
 
 ```text
-/Shortcuts/AgentRouterOKF/index.md
-/Shortcuts/AgentRouterOKF/profile.md
-/Shortcuts/AgentRouterOKF/preferences.md
-/Shortcuts/AgentRouterOKF/log.md
+/Shortcuts/IrisOKF/index.md
+/Shortcuts/IrisOKF/profile.md
+/Shortcuts/IrisOKF/preferences.md
+/Shortcuts/IrisOKF/log.md
 ```
 
 These paths must be validated on device because iOS Files permissions and path
@@ -72,7 +72,7 @@ behavior and practical validation steps.
 ## Runtime Behavior
 
 > Implementation status: only `memory_status` is currently wired into
-> `shortcuts/agent_router.cherri`. The startup bootstrap and the other memory
+> `shortcuts/iris.cherri`. The startup bootstrap and the other memory
 > tools below describe the intended design and are not yet implemented.
 
 The memory layer is a fixed set of predeclared tools, not arbitrary file access.
@@ -93,7 +93,7 @@ the remaining tools land.
 
 ## Result Envelopes
 
-Memory tools return the same normalized observation shape as other Agent Router
+Memory tools return the same normalized observation shape as other Iris
 tools:
 
 ```text

@@ -16,8 +16,8 @@ manual validation.
 
 - [ ] Signed shortcut imports successfully.
 - [ ] Unsigned shortcut import behavior is recorded, if tested.
-- [ ] Shortcut appears as `Agent Router`.
-- [ ] Siri can start it with "Hey Siri, Agent Router."
+- [ ] Shortcut appears as `Iris`.
+- [ ] Siri can start it with "Hey Siri, Iris."
 
 ## Configuration Tests
 
@@ -113,9 +113,9 @@ for tools that are documented but not yet wired in.
 | `web_search` | "When is the next FIFA World Cup match?" | Routes to Tavily (if a key is set) and returns a current answer. |
 | `summarize_provided_text` | "Summarize this text: The project kickoff is Monday and the design review is Wednesday." | Model summarizes only the provided text. |
 | `draft_reply` | "Draft a friendly reply saying I can join tomorrow at 3." | Reply text is drafted for review. |
-| `create_note` | "Create a note called Product Ideas with three ideas for Agent Router." | A Notes action runs and creates a note. |
+| `create_note` | "Create a note called Product Ideas with three ideas for Iris." | A Notes action runs and creates a note. |
 | `create_reminder` | "Remind me to call mom tomorrow at 6 PM." | Reminder action runs; date/time is recorded in notes until due-date support is validated. |
-| `quick_journal` | "Journal that today I tested Agent Router and fixed shortcut syntax." | A journal-style Apple Note is created. |
+| `quick_journal` | "Journal that today I tested Iris and fixed shortcut syntax." | A journal-style Apple Note is created. |
 | `calendar_lookup` | "What meetings do I have today?" | Upcoming calendar events are fetched as structured details, sent to the model, and summarized. |
 | `reminders_lookup` | "What reminders are coming up?" | Upcoming reminders are fetched and summarized. |
 | `open_search` | "Search YouTube for best iPhone shortcuts." | Approved YouTube search URL opens. |
@@ -126,7 +126,7 @@ for tools that are documented but not yet wired in.
 | `weather_summary` | "What's the weather today?" | Weather actions run and the model summarizes the result. |
 | `current_location_summary` | "Where am I right now?" | Location action runs and the model summarizes it. |
 | `device_status` | "What device am I using?" | Device details are fetched and summarized. |
-| `memory_status` | "Check Agent Router memory status." | OKF folder status is returned as a tool observation. |
+| `memory_status` | "Check Iris memory status." | OKF folder status is returned as a tool observation. |
 
 ## Action Availability Matrix
 

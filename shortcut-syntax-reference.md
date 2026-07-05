@@ -8,7 +8,7 @@ tags:
   - syntax-reference
   - app-intents
   - action-identifiers
-  - agent-router
+  - iris
 sources:
   - https://www.icloud.com/shortcuts/feabeb61fb5a43609b265beef85f1df4
   - tmp/icloud-shortcut-feabeb61fb5a43609b265beef85f1df4.plist.json
@@ -41,7 +41,7 @@ a normal unsigned Shortcut plist. The decoded fixture is saved at
   compiled plist is inspected afterward. Previous builds showed `rawAction(...)`
   can lower to `is.workflow.actions.rawaction`, which iOS treats as unsupported.
 - Keep the manually decoded plist in `tmp/` as the source of truth when adding
-  new tool actions to Agent Router.
+  new tool actions to Iris.
 - Re-test on device after adding any action that mutates data, opens private app
   state, or depends on a third-party app being installed.
 
@@ -250,9 +250,9 @@ action has `WFControlFlowMode: 2`. Both share the same `GroupingIdentifier`.
 }
 ```
 
-## Agent Router Implications
+## Iris Implications
 
-The most useful near-term additions for Agent Router are:
+The most useful near-term additions for Iris are:
 
 - `open_search` and `open_destination`, using known URL schemes or proven direct
   App Intent identifiers like Chrome Lens, Chrome search, Google Maps search,

@@ -1,6 +1,6 @@
 # Routes
 
-Agent Router uses a hosted NVIDIA NIM model (build.nvidia.com) as the planner,
+Iris uses a hosted NVIDIA NIM model (build.nvidia.com) as the planner,
 called through the OpenAI-compatible endpoint
 `https://integrate.api.nvidia.com/v1/chat/completions` with an `nvapi-` key
 pasted once into an editable Text action (see `docs/configuration.md`). It does not use Apple Intelligence
@@ -51,7 +51,7 @@ Field rules:
   `speak`, `range`, `calendar`, `subject`, and `requires_confirmation` fields
   were removed to keep the per-turn prompt compact.
 
-Agent Router runs this contract in a bounded loop: up to 8 agent turns, 3 native
+Iris runs this contract in a bounded loop: up to 8 agent turns, 3 native
 tool calls, and 2 user clarification prompts. The Shortcut regex-extracts and
 regex-validates the flat JSON before parsing; a reply with no JSON at all is
 treated as a plain prose answer and spoken. If the model returns invalid
@@ -61,7 +61,7 @@ default path must never rely on arbitrary actions invented by the model.
 
 ## Implemented Routes
 
-These are the tool names currently wired into `shortcuts/agent_router.cherri`.
+These are the tool names currently wired into `shortcuts/iris.cherri`.
 Every one is predeclared; the model can only select from this list. Any tool
 name the model invents that is not on this list returns an `ok=false` "unknown
 or unavailable tool" observation instead of running.
@@ -86,7 +86,7 @@ or unavailable tool" observation instead of running.
 | `maps_search` | Opens a Google Maps web search for the query. | Browser/Maps handoff. | Experimental until import/runtime test. |
 | `nearby_search` | Opens a Google Maps web search with `near me` appended. | Browser/Maps handoff. | Experimental until import/runtime test. |
 | `draft_message` | Drafts message text with the model and copies it to the clipboard for review. Does not send. | NVIDIA key, Clipboard. | Implemented; safe fallback. |
-| `memory_status` | Checks the fixed OKF folder `/Shortcuts/AgentRouterOKF` and returns its folder contents as an observation. | Files/iCloud Drive permission. | Experimental until device path validation. |
+| `memory_status` | Checks the fixed OKF folder `/Shortcuts/IrisOKF` and returns its folder contents as an observation. | Files/iCloud Drive permission. | Experimental until device path validation. |
 
 ## Not Yet Implemented
 

@@ -1,6 +1,6 @@
 # Configuration
 
-Agent Router intentionally does not commit secrets.
+Iris intentionally does not commit secrets.
 
 ## Default Backend: NVIDIA NIM (build.nvidia.com)
 
@@ -52,7 +52,7 @@ Whitespace is stripped from both Text values at runtime, so a stray newline
 from pasting cannot corrupt the Authorization header.
 
 The free tier is rate-limited (about 40 requests per minute per key, shared
-across models, subject to change) rather than credit-based. One Agent Router
+across models, subject to change) rather than credit-based. One Iris
 conversation uses roughly 2-10 requests.
 
 Do not commit a real API key to this repository. Do not upload generated or
@@ -97,7 +97,7 @@ The workaround is to trigger every prompt once, in a single manual run, so
 hands-free Siri never prompts again. The shortcut has a built-in **permission
 primer** for this:
 
-1. After importing the final build and pasting your key, run Agent Router
+1. After importing the final build and pasting your key, run Iris
    **manually from the Shortcuts app, on an unlocked phone** (not via Siri).
 2. Answer the first prompt with **"setup"** (or "grant permissions").
 3. Tap **Always Allow** — not "Allow Once" — on every dialog that appears
@@ -117,23 +117,23 @@ After this, normal voice requests run without popups. Notes:
 - The primer only runs when the request begins with a setup phrase; normal
   requests like "set a reminder" or "access my calendar" are unaffected.
 
-## Invocation: launching without saying "Agent Router"
+## Invocation: launching without saying "Iris"
 
-By default you launch the shortcut by its name: "Hey Siri, Agent Router". The
-shortcut's name IS its Siri trigger phrase (set by `#define name Agent Router`
-in `shortcuts/agent_router.cherri`).
+By default you launch the shortcut by its name: "Hey Siri, Iris". The
+shortcut's name IS its Siri trigger phrase (set by `#define name Iris`
+in `shortcuts/iris.cherri`).
 
 iOS does not let a third-party shortcut replace Siri's built-in handling of
 general "Hey Siri ..." questions, and the "Hey Siri" wake word itself cannot be
 changed (verified 2026-07). So there is no way to make a bare "Hey Siri, what's
-the weather" route into Agent Router. What you CAN do:
+the weather" route into Iris. What you CAN do:
 
 1. **Vocal Shortcuts (best "just say a word" option).** Settings →
-   Accessibility → Vocal Shortcuts → Set Up Vocal Shortcuts, pick Agent Router,
+   Accessibility → Vocal Shortcuts → Set Up Vocal Shortcuts, pick Iris,
    and record a short custom phrase (for example "assistant" or "computer").
-   After that the phrase runs Agent Router on-device **without saying "Siri" at
+   After that the phrase runs Iris on-device **without saying "Siri" at
    all**. It is the closest thing to a custom wake word.
-2. **Rename to a shorter phrase.** Change `#define name Agent Router` to a short,
+2. **Rename to a shorter phrase.** Change `#define name Iris` to a short,
    natural word (for example `#define name Assistant`), rebuild, and re-import.
    Then "Hey Siri, Assistant" is all you say. Keep it distinct from Apple's own
    command words so Siri does not intercept it. Re-run the "setup" primer after
@@ -141,10 +141,10 @@ the weather" route into Agent Router. What you CAN do:
 3. **No-voice launch.** Bind the shortcut to the **Action Button** (iPhone 15
    Pro and later), a **Back Tap** (Settings → Accessibility → Touch → Back Tap),
    or add it to the **Home Screen / Lock Screen / Today View / Control Center**.
-   Any of these opens Agent Router directly, and it immediately asks "What
-   should Agent Router do?" so you just talk.
+   Any of these opens Iris directly, and it immediately asks "What
+   should Iris do?" so you just talk.
 
-Whichever entry point you use, the conversation model is unchanged: Agent Router
+Whichever entry point you use, the conversation model is unchanged: Iris
 asks, listens, answers, and offers "Anything else?" until you say a stop word.
 
 ## Previous Backend: ChatGPT app App Intent
@@ -164,10 +164,10 @@ prompt. There is no custom text-to-speech in the shortcut. See
 
 ## OKF Memory Folder
 
-Agent Router expects an optional OKF-style memory folder at:
+Iris expects an optional OKF-style memory folder at:
 
 ```text
-Shortcuts/AgentRouterOKF/
+Shortcuts/IrisOKF/
 ```
 
 The first files to create on the phone are:
@@ -180,8 +180,8 @@ log.md
 ```
 
 The Shortcut currently reads fixed paths such as
-`/Shortcuts/AgentRouterOKF/index.md` and appends confirmed memory writes to
-`/Shortcuts/AgentRouterOKF/log.md`. These paths are experimental until validated
+`/Shortcuts/IrisOKF/index.md` and appends confirmed memory writes to
+`/Shortcuts/IrisOKF/log.md`. These paths are experimental until validated
 on a target iPhone because iOS Files/iCloud Drive path behavior can vary.
 
 See `docs/okf-knowledge-base.md` for the concept format and privacy rules.

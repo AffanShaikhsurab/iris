@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
-"""Faithful offline simulator for the Agent Router shortcut.
+"""Faithful offline simulator for the Iris shortcut.
 
-This reproduces the CURRENT shortcuts/agent_router.cherri loop closely enough to
+This reproduces the CURRENT shortcuts/iris.cherri loop closely enough to
 iterate on the model prompt and dispatch logic without deploying to an iPhone.
 
 What is REAL vs mocked:
@@ -44,7 +44,7 @@ import sys
 import urllib.error
 import urllib.request
 
-# --- Constants copied VERBATIM from shortcuts/agent_router.cherri ---
+# --- Constants copied VERBATIM from shortcuts/iris.cherri ---
 NIM_URL = "https://integrate.api.nvidia.com/v1/chat/completions"
 DEFAULT_MODEL = "meta/llama-3.1-8b-instruct"
 MAX_TURNS = 50
@@ -82,11 +82,11 @@ STOP_WORD_RE = re.compile(
 )
 MARKDOWN_RE = re.compile(r"[\*_#`]+")
 
-# The protocol MUST be kept in sync with agent_router.cherri line 169. This is a
+# The protocol MUST be kept in sync with iris.cherri line 169. This is a
 # transcription of the current source; the sync check below fails loudly if the
 # .cherri protocol drifts from this copy.
 PROTOCOL = (
-    "You are Agent Router, a warm, friendly and capable voice assistant inside an "
+    "You are Iris, a warm, friendly and capable voice assistant inside an "
     "Apple Shortcut on the user's iPhone, talking through Siri. You handle casual "
     "chat, jokes, stories, ideas and opinions just as happily as you handle tasks. "
     "Reply with exactly one flat single-line JSON object and "
@@ -406,7 +406,7 @@ def run(scenario: Scenario, model: str, use_mock: bool, verbose: bool):
 
     if outcome != "finish":
         final_text = last_local_final or (
-            "I ran out of conversation turns. Please start Agent Router again.")
+            "I ran out of conversation turns. Please start Iris again.")
         trace.append((MAX_TURNS, "turn_budget_exhausted", ""))
 
     # --- assertions ---
@@ -557,8 +557,8 @@ def main():
 
 
 def check_protocol_sync():
-    """Warn loudly if agent_router.cherri's protocol string drifts from PROTOCOL."""
-    src = os.path.join(os.path.dirname(__file__), "..", "shortcuts", "agent_router.cherri")
+    """Warn loudly if iris.cherri's protocol string drifts from PROTOCOL."""
+    src = os.path.join(os.path.dirname(__file__), "..", "shortcuts", "iris.cherri")
     try:
         text = open(src, encoding="utf-8").read()
     except OSError:
@@ -575,7 +575,7 @@ def check_protocol_sync():
     ]
     missing = [m for m in markers if m not in text]
     if missing:
-        print("WARNING: simulator PROTOCOL may be out of sync with agent_router.cherri; "
+        print("WARNING: simulator PROTOCOL may be out of sync with iris.cherri; "
               f"missing markers in source: {missing}", file=sys.stderr)
 
 

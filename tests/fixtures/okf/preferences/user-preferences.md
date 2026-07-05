@@ -1,7 +1,7 @@
 ---
 type: User Preference
 title: User Planning Preferences
-description: Stable preferences that help Agent Router answer in the user's preferred style.
+description: Stable preferences that help Iris answer in the user's preferred style.
 tags:
   - user
   - preferences

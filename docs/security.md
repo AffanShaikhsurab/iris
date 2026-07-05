@@ -1,6 +1,6 @@
 # Security Notes
 
-Agent Router combines user-provided text, an external model provider, and native
+Iris combines user-provided text, an external model provider, and native
 Shortcuts actions. Keep the trust boundaries explicit.
 
 ## Trust Boundaries

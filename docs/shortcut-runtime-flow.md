@@ -1,11 +1,11 @@
 ---
 type: Architecture
 title: Shortcut Runtime Flow And Loop Failure Notes
-summary: Documents the real Apple Shortcuts execution model, Agent Router loop model, and known failure modes found during iPhone testing.
+summary: Documents the real Apple Shortcuts execution model, Iris loop model, and known failure modes found during iPhone testing.
 status: active-debug-reference
 tags:
   - apple-shortcuts
-  - agent-router
+  - iris
   - runtime-flow
   - debugging
 related:
@@ -16,8 +16,8 @@ related:
 
 # Shortcut Runtime Flow And Loop Failure Notes
 
-This file records the runtime model that Agent Router must follow. Read this
-before changing `shortcuts/agent_router.cherri`.
+This file records the runtime model that Iris must follow. Read this
+before changing `shortcuts/iris.cherri`.
 
 ## Critical Compiler Rule: Never Use `else if`
 
@@ -29,7 +29,7 @@ on. Decoding old builds showed 28 of 54 groups unclosed; on device this makes
 everything after a taken branch get skipped or misattributed to the wrong
 block. This was the root cause of the "loop compiles but never works" symptom.
 
-Rules for `shortcuts/agent_router.cherri`:
+Rules for `shortcuts/iris.cherri`:
 
 - Never write `else if`. Plain `if { } else { }` and nested blocks compile
   correctly.
@@ -41,7 +41,7 @@ Rules for `shortcuts/agent_router.cherri`:
 
 ## Siri Is The Voice Interface (Ask-for-Input pattern)
 
-When Agent Router is started by voice ("Hey Siri, Agent Router"), the only
+When Iris is started by voice ("Hey Siri, Iris"), the only
 reliable conversational primitive is **Ask for Input** (`prompt()`): Siri
 reads the prompt aloud in her own voice, then listens and returns the reply
 as dictated text. Everything else is unreliable:
@@ -102,7 +102,7 @@ interactive gates. Two things to check, in order:
    in-hand, it is #1 (network grant); if it only fails while locked, it is #2.
 
 Rather than exercising each route by hand, use the built-in **permission
-primer**: run Agent Router manually (unlocked) and answer the first prompt with
+primer**: run Iris manually (unlocked) and answer the first prompt with
 "setup". It fires every permission prompt at once (network, Calendar, Reminders,
 Location, Weather, Files, Notes) so you tap Always Allow once each; hands-free
 Siri runs then never popup. There is NO bulk "allow all" in iOS — consent is
@@ -154,7 +154,7 @@ model call is killed by the system and surfaces as Siri's generic
 
 `Get Dictionary from Input` does not return an error value on invalid JSON; it
 halts the entire Shortcut. Model output must never reach `getDictionary()`
-unchecked. Agent Router first regex-extracts the JSON object from the reply,
+unchecked. Iris first regex-extracts the JSON object from the reply,
 then regex-validates that it is one flat JSON object, and only then parses it.
 A reply with no JSON at all is treated as a plain prose answer and spoken.
 
@@ -186,13 +186,13 @@ Important primitives:
 
 The ChatGPT app action is an external dependency. Web reports and device testing
 show it can fail with helper-communication/session problems or require the user
-to open/sign in to the ChatGPT app. Agent Router cannot fully fix this inside
+to open/sign in to the ChatGPT app. Iris cannot fully fix this inside
 Shortcuts.
 
 Operational rule:
 
 - Open the ChatGPT app manually and confirm the account is signed in before
-  testing Agent Router.
+  testing Iris.
 - If the ChatGPT app logs out or the App Intent fails, simplify the Shortcut
   will not help. The dependency has failed before the agent loop can reason.
 - A future robust fallback should use a direct API call route, but that requires

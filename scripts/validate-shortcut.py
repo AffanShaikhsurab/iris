@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Structural validator for compiled Agent Router shortcuts.
+"""Structural validator for compiled Iris shortcuts.
 
 Cherri v2.3.0 has a code-generation bug: `else if` chains emit conditional
 groups whose closing action (WFControlFlowMode 2) is never generated, which

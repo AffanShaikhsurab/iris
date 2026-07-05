@@ -1,6 +1,6 @@
-# Shortcut Agent Router
+# Iris
 
-Shortcut Agent Router is an open-source proof of concept for building an
+Iris is an open-source proof of concept for building an
 AI-routed Apple Shortcut from source code. The Shortcut is written in
 [Cherri](https://cherrilang.org/), a language that compiles directly to Apple
 Shortcuts.
@@ -10,7 +10,7 @@ routes, but every native action must be predeclared in the Shortcut source.
 
 ## What It Does
 
-The Agent Router shortcut is model-first, using a hosted NVIDIA NIM model as the
+The Iris shortcut is model-first, using a hosted NVIDIA NIM model as the
 planner:
 
 - Ask any general question and get a spoken answer.
@@ -35,7 +35,7 @@ preserved in `notes.md` if you want to use it again.
 
 ## How The Shortcut Works
 
-1. You invoke the shortcut by name, for example: "Hey Siri, Agent Router."
+1. You invoke the shortcut by name, for example: "Hey Siri, Iris."
 2. The shortcut asks what you want to do.
 3. It enters a bounded agent loop with accumulated context, making exactly one
    model call per turn.
@@ -56,8 +56,8 @@ only work with content you provide, share into it, or expose through verified
 Shortcuts actions on your device. It does not have Apple Intelligence-level
 private access to Gmail, Mail, Messages, or the current screen.
 
-For durable context, Agent Router has an experimental hook for an optional
-OKF-style folder at `Shortcuts/AgentRouterOKF/`. Only a folder-status check
+For durable context, Iris has an experimental hook for an optional
+OKF-style folder at `Shortcuts/IrisOKF/`. Only a folder-status check
 (`memory_status`) is implemented today; deeper retrieval and writes are still
 planned. Anything eventually inserted into a model prompt is sent to the
 provider, so do not store sensitive information there. See
@@ -82,7 +82,7 @@ Compile the shortcut:
 
 ```bash
 mkdir -p dist
-cherri shortcuts/agent_router.cherri --debug --output "dist/Agent Router.shortcut"
+cherri shortcuts/iris.cherri --debug --output "dist/Iris.shortcut"
 ```
 
 In Cherri `v2.3.0`, non-macOS compilation may sign through HubSign by default.
@@ -94,8 +94,8 @@ with:
 
 ```bash
 shortcuts sign --mode anyone \
-  --input "dist/Agent Router.shortcut" \
-  --output "dist/Agent Router.signed.shortcut"
+  --input "dist/Iris.shortcut" \
+  --output "dist/Iris.signed.shortcut"
 ```
 
 The repository includes GitHub Actions workflows that install Cherri, compile the
@@ -119,7 +119,7 @@ python scripts/simulate-agent.py --mock --model-reply '{"type":"final_answer","a
 It exits nonzero if any assertion fails, so it doubles as a regression test for
 the planner prompt.
 
-The CI workflow compiles `shortcuts/agent_router.cherri` on Linux. The build
+The CI workflow compiles `shortcuts/iris.cherri` on Linux. The build
 workflow compiles on macOS, attempts `shortcuts sign`, and uploads the unsigned
 shortcut, signed shortcut if available, and signing logs.
 
@@ -143,7 +143,7 @@ See `docs/security.md` and `docs/configuration.md`.
 ## Project Status
 
 This is an alpha proof of concept. The Shortcut source now lives in
-`shortcuts/agent_router.cherri`. Windows support depends on Cherri compiler
+`shortcuts/iris.cherri`. Windows support depends on Cherri compiler
 availability; if local Windows compilation is rough, use the GitHub Actions
 workflow as the canonical build path.
 

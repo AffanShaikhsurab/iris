@@ -11,13 +11,13 @@ Latest local test:
 - Environment: WSL2 Ubuntu on Windows.
 - Cherri: `v2.3.0` Linux x86_64 release.
 - Signed command:
-  `cherri shortcuts/agent_router.cherri --hubsign --share=anyone --output='dist/Agent Router.shortcut'`.
-- Result: `dist/Agent Router.shortcut` generated successfully.
+  `cherri shortcuts/iris.cherri --hubsign --share=anyone --output='dist/Iris.shortcut'`.
+- Result: `dist/Iris.shortcut` generated successfully.
 - Header: `AEA1`.
 - Current artifact aliases:
-  - `dist/Agent Router.shortcut`
-  - `dist/Agent Router.signed.shortcut`
-  - `dist/agent-router.shortcut`
+  - `dist/Iris.shortcut`
+  - `dist/Iris.signed.shortcut`
+  - `dist/iris.shortcut`
 
 `AEA1` means the output is already in signed/package-formatted Shortcut form.
 It is the file to import onto iPhone.
@@ -27,7 +27,7 @@ It is the file to import onto iPhone.
 From PowerShell in the repo root:
 
 ```powershell
-wsl -- bash -lc "mkdir -p /tmp/cherri-agent-router && cd /tmp/cherri-agent-router && curl -L -o cherri_linux-x86_64.zip https://github.com/electrikmilk/cherri/releases/download/v2.3.0/cherri_linux-x86_64.zip && python3 - <<'PY'
+wsl -- bash -lc "mkdir -p /tmp/cherri-iris && cd /tmp/cherri-iris && curl -L -o cherri_linux-x86_64.zip https://github.com/electrikmilk/cherri/releases/download/v2.3.0/cherri_linux-x86_64.zip && python3 - <<'PY'
 import zipfile
 with zipfile.ZipFile('cherri_linux-x86_64.zip') as z:
     z.extractall('.')
@@ -38,21 +38,21 @@ chmod +x cherri && ./cherri --version"
 Compile and sign with HubSign:
 
 ```powershell
-wsl -- bash -lc "cd '/mnt/c/Users/affan/Fun Projects/siri' && /tmp/cherri-agent-router/cherri shortcuts/agent_router.cherri --hubsign --share=anyone --output='dist/Agent Router.shortcut'"
+wsl -- bash -lc "cd '/mnt/c/Users/affan/Fun Projects/siri' && /tmp/cherri-iris/cherri shortcuts/iris.cherri --hubsign --share=anyone --output='dist/Iris.shortcut'"
 ```
 
 Mirror the signed artifact to the conventional names:
 
 ```powershell
-Copy-Item -LiteralPath "dist\Agent Router.shortcut" -Destination "dist\Agent Router.signed.shortcut" -Force
-Copy-Item -LiteralPath "dist\Agent Router.shortcut" -Destination "dist\agent-router.shortcut" -Force
-Set-Content -LiteralPath "dist\signing-result.txt" -Value "Signing succeeded via Cherri HubSign. dist/Agent Router.shortcut, dist/Agent Router.signed.shortcut, and dist/agent-router.shortcut are current AEA1 signed/package-formatted artifacts." -Encoding UTF8
+Copy-Item -LiteralPath "dist\Iris.shortcut" -Destination "dist\Iris.signed.shortcut" -Force
+Copy-Item -LiteralPath "dist\Iris.shortcut" -Destination "dist\iris.shortcut" -Force
+Set-Content -LiteralPath "dist\signing-result.txt" -Value "Signing succeeded via Cherri HubSign. dist/Iris.shortcut, dist/Iris.signed.shortcut, and dist/iris.shortcut are current AEA1 signed/package-formatted artifacts." -Encoding UTF8
 ```
 
 Verify the first four bytes:
 
 ```powershell
-$files = @("dist\Agent Router.shortcut", "dist\Agent Router.signed.shortcut", "dist\agent-router.shortcut", "shortcuts\Agent Router_unsigned.shortcut")
+$files = @("dist\Iris.shortcut", "dist\Iris.signed.shortcut", "dist\iris.shortcut", "shortcuts\Iris_unsigned.shortcut")
 $enc = [System.Text.Encoding]::GetEncoding("iso-8859-1")
 foreach ($f in $files) {
   if (Test-Path -LiteralPath $f) {
@@ -67,13 +67,13 @@ foreach ($f in $files) {
 Expected signed output:
 
 ```text
-dist\Agent Router.shortcut header=AEA1
-dist\Agent Router.signed.shortcut header=AEA1
-dist\agent-router.shortcut header=AEA1
+dist\Iris.shortcut header=AEA1
+dist\Iris.signed.shortcut header=AEA1
+dist\iris.shortcut header=AEA1
 ```
 
 Cherri also writes a local unsigned XML shortcut such as
-`shortcuts/Agent Router_unsigned.shortcut`. That file starts with `<?xm` and is
+`shortcuts/Iris_unsigned.shortcut`. That file starts with `<?xm` and is
 not the normal iPhone import artifact.
 
 ## HubSign Notes
@@ -87,7 +87,7 @@ Error: Unsupported response type: text/plain; charset=utf-8
 retry the explicit command:
 
 ```bash
-/tmp/cherri-agent-router/cherri shortcuts/agent_router.cherri --hubsign --share=anyone --output='dist/Agent Router.shortcut'
+/tmp/cherri-iris/cherri shortcuts/iris.cherri --hubsign --share=anyone --output='dist/Iris.shortcut'
 ```
 
 In the latest local run, a first signing attempt failed with that response-type
@@ -96,7 +96,7 @@ error, but the explicit `--hubsign --share=anyone` retry succeeded.
 To compile without signing for debugging:
 
 ```bash
-/tmp/cherri-agent-router/cherri shortcuts/agent_router.cherri --debug --skip-sign --output='dist/Agent Router.shortcut'
+/tmp/cherri-iris/cherri shortcuts/iris.cherri --debug --skip-sign --output='dist/Iris.shortcut'
 ```
 
 That produces unsigned XML/debug artifacts and is useful for compiler debugging,
@@ -108,8 +108,8 @@ On macOS, use Apple's built-in command:
 
 ```bash
 shortcuts sign --mode anyone \
-  --input "dist/Agent Router.shortcut" \
-  --output "dist/Agent Router.signed.shortcut"
+  --input "dist/Iris.shortcut" \
+  --output "dist/Iris.signed.shortcut"
 ```
 
 `--mode anyone` asks Apple/iCloud to notarize the Shortcut so anyone can import
@@ -119,7 +119,7 @@ runner.
 ## GitHub Actions Signing
 
 The `build-shortcut.yml` workflow runs on `macos-15`, installs Cherri, compiles
-`shortcuts/agent_router.cherri`, attempts `shortcuts sign`, and uploads whichever
+`shortcuts/iris.cherri`, attempts `shortcuts sign`, and uploads whichever
 artifact is available.
 
 The workflow inspects the first four bytes of the generated file:
@@ -134,8 +134,8 @@ sign on a real Mac, a temporary cloud Mac, or another controlled macOS runner.
 
 Uploaded artifacts:
 
-- `dist/Agent Router.shortcut`: compiled shortcut.
-- `dist/Agent Router.signed.shortcut`: signed shortcut, if signing succeeds.
+- `dist/Iris.shortcut`: compiled shortcut.
+- `dist/Iris.signed.shortcut`: signed shortcut, if signing succeeds.
 - `dist/signing-result.txt`: one-line success/failure summary.
 - `dist/signing-output.log`: raw signing command output, if produced.
 

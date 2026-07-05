@@ -4,7 +4,7 @@ Use this checklist before publishing a signed Shortcut artifact.
 
 ## Source Checks
 
-- [ ] `shortcuts/agent_router.cherri` compiles in CI.
+- [ ] `shortcuts/iris.cherri` compiles in CI.
 - [ ] `docs/routes.md` matches the supported route list.
 - [ ] `README.md` describes the current signing/import status.
 - [ ] No real API keys or private automation data are committed.
@@ -20,7 +20,7 @@ Use this checklist before publishing a signed Shortcut artifact.
 ## Device Checks
 
 - [ ] Signed shortcut imports on iPhone.
-- [ ] “Hey Siri, Agent Router” starts the shortcut.
+- [ ] “Hey Siri, Iris” starts the shortcut.
 - [ ] Summarize route works.
 - [ ] Draft reply route works.
 - [ ] Note/reminder route status is documented.

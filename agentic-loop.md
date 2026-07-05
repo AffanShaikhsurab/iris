@@ -1,10 +1,10 @@
 ---
 type: Architecture
-title: Agentic Tool Loop for Shortcut Agent Router
-summary: Defines the desired main-agent/tool-call/result-loop architecture for Agent Router.
+title: Agentic Tool Loop for Iris
+summary: Defines the desired main-agent/tool-call/result-loop architecture for Iris.
 status: implemented-uniform-loop-v2
 tags:
-  - agent-router
+  - iris
   - agentic-loop
   - apple-shortcuts
   - tool-calling
@@ -18,7 +18,7 @@ related:
 
 # Agentic Tool Loop
 
-Agent Router should behave like a small tool-using agent implemented inside
+Iris should behave like a small tool-using agent implemented inside
 Apple Shortcuts. ChatGPT is the main agent. The Shortcut is the deterministic
 tool executor. Native app actions are tools.
 
@@ -91,7 +91,7 @@ observation.
 
 ## Bounded Repeat Loop
 
-Agent Router uses a real bounded repeat loop rather than one follow-up turn. The
+Iris uses a real bounded repeat loop rather than one follow-up turn. The
 loop lets the agent call tools, ask the user for missing information, receive
 observations, and decide when to stop. Every loop turn makes exactly one
 ChatGPT call at the top, so there is a single call site and a single parse
@@ -129,7 +129,7 @@ execution, repeated permission prompts, and unbounded ChatGPT calls.
 Tools are grouped by daily workflow. Each tool must stay predeclared in the
 Shortcut source and documented in `docs/routes.md`.
 
-Implemented tools (wired into `shortcuts/agent_router.cherri`):
+Implemented tools (wired into `shortcuts/iris.cherri`):
 
 | Tool | Purpose | Status |
 | --- | --- | --- |

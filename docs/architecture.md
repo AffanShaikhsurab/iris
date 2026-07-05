@@ -1,6 +1,6 @@
 # Architecture
 
-Shortcut Agent Router is built around a constrained planner/executor loop.
+Iris is built around a constrained planner/executor loop.
 
 ## Planner
 
@@ -19,7 +19,7 @@ arguments such as `target`, `title`, `notes`, `query`, `date`, `time`, `list`,
 `body`, and `recipient`.
 
 This intentionally does not use Apple's `Use Model` / `askllm` action because
-that path depends on Apple Intelligence support. Agent Router is meant for
+that path depends on Apple Intelligence support. Iris is meant for
 devices that do not have Apple Intelligence. An earlier version used the ChatGPT
 app's own `com.openai.chat.AskIntent` App Intent; that no-key backend shape is
 preserved in `notes.md` and `shortcut-syntax-reference.md`.
@@ -58,7 +58,7 @@ auditable executor.
 
 ## Bounded Loop
 
-Agent Router uses a bounded repeat loop. Each iteration sends the original
+Iris uses a bounded repeat loop. Each iteration sends the original
 request, current budgets, and accumulated observations to the model. The model
 can finish, ask the user for one missing detail, or call one allowed tool. Tool
 and user responses are appended to a text loop context and sent back on the next
@@ -108,9 +108,9 @@ context across turns.
 
 ## OKF Memory Layer
 
-Agent Router treats phone-local OKF memory under `Shortcuts/AgentRouterOKF/` as
+Iris treats phone-local OKF memory under `Shortcuts/IrisOKF/` as
 a predeclared-tool surface, not arbitrary file access. Today only one memory
-tool is implemented in `shortcuts/agent_router.cherri`:
+tool is implemented in `shortcuts/iris.cherri`:
 
 - `memory_status`: checks whether the OKF folder can be read and returns its
   folder contents as an observation.
@@ -126,7 +126,7 @@ memory folder into prompts.
 
 ## Siri Invocation
 
-The phrase "Hey Siri, Agent Router" starts the shortcut by name. Siri does not
+The phrase "Hey Siri, Iris" starts the shortcut by name. Siri does not
 grant this shortcut the same private context that Apple Intelligence uses. The
 shortcut can work with:
 
@@ -142,7 +142,7 @@ Shortcuts actions and the user grants permission.
 
 ## Safety Tiers
 
-Agent Router exposes low- and medium-risk routes first:
+Iris exposes low- and medium-risk routes first:
 
 - Low risk: answer, summarize, draft, show, copy, or open an allowlisted
   destination.
@@ -157,7 +157,7 @@ allowlisted, and require explicit confirmation.
 
 ## Generation Backend
 
-The Shortcut source is written in Cherri at `shortcuts/agent_router.cherri`.
+The Shortcut source is written in Cherri at `shortcuts/iris.cherri`.
 Cherri is a Go-based compiler for Apple Shortcuts. It parses `.cherri` files,
 type-checks Shortcut actions, and emits `.shortcut` artifacts.
 

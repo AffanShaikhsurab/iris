@@ -1,6 +1,6 @@
 # Contributing
 
-Thanks for helping build Shortcut Agent Router. The project is intentionally
+Thanks for helping build Iris. The project is intentionally
 small and explicit so contributors can understand what each generated Shortcut
 action does.
 
@@ -23,7 +23,7 @@ Compile the Shortcut:
 
 ```bash
 mkdir -p dist
-cherri shortcuts/agent_router.cherri --debug --output "dist/Agent Router.shortcut"
+cherri shortcuts/iris.cherri --debug --output "dist/Iris.shortcut"
 ```
 
 For the known-good Windows path, use WSL2 with the Linux Cherri release and
@@ -42,7 +42,7 @@ start with the `AEA1` header.
 
 ## Adding A Route
 
-1. Add the route to `shortcuts/agent_router.cherri`.
+1. Add the route to `shortcuts/iris.cherri`.
 2. Prefer Cherri standard library actions; use `rawAction` only when needed.
 3. Update `README.md` and `docs/routes.md`.
 4. Compile the shortcut with `--debug`.
@@ -51,7 +51,7 @@ start with the `AEA1` header.
 
 ## Pull Request Checklist
 
-- `cherri shortcuts/agent_router.cherri --debug --output "dist/Agent Router.shortcut"` succeeds.
+- `cherri shortcuts/iris.cherri --debug --output "dist/Iris.shortcut"` succeeds.
 - Documentation reflects user-facing behavior.
 - No secrets or private data are included.
 - New routes follow `docs/security.md`.

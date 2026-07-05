@@ -1,6 +1,6 @@
 ---
 name: Route request
-about: Propose a new Agent Router Shortcut route
+about: Propose a new Iris Shortcut route
 title: "Route: "
 labels: enhancement, route
 ---

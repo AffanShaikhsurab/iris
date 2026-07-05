@@ -1,4 +1,4 @@
-# Shortcut Agent Router Plan
+# Iris Plan
 
 ## Goal
 
@@ -15,9 +15,9 @@ that uses Shortcuts as the execution engine and an AI model as the planner.
 ## Core User Flow
 
 ```text
-User says: "Hey Siri, Agent Router"
+User says: "Hey Siri, Iris"
         ↓
-Apple Shortcuts starts Agent Router
+Apple Shortcuts starts Iris
         ↓
 Shortcut asks what the user wants to do
         ↓
@@ -64,7 +64,7 @@ work: parsing, action lowering, Shortcut plist generation, and signing support.
 ```mermaid
 flowchart TD
   User["User voice request"] --> Siri["Siri"]
-  Siri --> Shortcut["Agent Router Shortcut"]
+  Siri --> Shortcut["Iris Shortcut"]
   Shortcut --> Planner["OpenAI-compatible API"]
   Planner --> Json["Structured JSON route"]
   Json --> Router["Shortcut route branch"]
@@ -74,7 +74,7 @@ flowchart TD
   Router --> Summary["Summarize route"]
   Router --> ChatGPT["ChatGPT fallback"]
 
-  Source["shortcuts/agent_router.cherri"] --> Cherri["Cherri compiler"]
+  Source["shortcuts/iris.cherri"] --> Cherri["Cherri compiler"]
   Cherri --> ShortcutFile[".shortcut artifact"]
   ShortcutFile --> Signing["macOS shortcuts sign"]
   Signing --> SignedShortcut["Signed importable shortcut"]
@@ -130,28 +130,28 @@ cross-app control.
 Local source:
 
 ```text
-shortcuts/agent_router.cherri
+shortcuts/iris.cherri
 ```
 
 Compile:
 
 ```bash
-cherri shortcuts/agent_router.cherri --debug --output "dist/Agent Router.shortcut"
+cherri shortcuts/iris.cherri --debug --output "dist/Iris.shortcut"
 ```
 
 Sign on macOS:
 
 ```bash
 shortcuts sign --mode anyone \
-  --input "dist/Agent Router.shortcut" \
-  --output "dist/Agent Router.signed.shortcut"
+  --input "dist/Iris.shortcut" \
+  --output "dist/Iris.signed.shortcut"
 ```
 
 CI should:
 
 1. Install Go.
 2. Install Cherri.
-3. Compile `shortcuts/agent_router.cherri`.
+3. Compile `shortcuts/iris.cherri`.
 4. On macOS, attempt `shortcuts sign`.
 5. Upload generated artifacts.
 
@@ -171,7 +171,7 @@ fresh GitHub-hosted macOS runner without an interactive iCloud session.
 
 ### Milestone 1: Compile
 
-- Keep `shortcuts/agent_router.cherri` compiling in CI.
+- Keep `shortcuts/iris.cherri` compiling in CI.
 - Produce an unsigned `.shortcut` artifact.
 
 ### Milestone 2: Sign

@@ -1,6 +1,6 @@
 ---
 type: Technical Note
-title: Working ChatGPT App Intent for Agent Router
+title: Working ChatGPT App Intent for Iris
 summary: Phone-created Shortcut export confirms the native ChatGPT AskIntent shape supported on the current test device.
 status: validated-on-device
 tags:
@@ -8,7 +8,7 @@ tags:
   - chatgpt
   - app-intents
   - cherri
-  - agent-router
+  - iris
 sources:
   - https://www.icloud.com/shortcuts/6b92d6285d1c4d1bad8462747b4e6e04
   - https://github.com/GoogleCloudPlatform/knowledge-catalog/tree/main/okf
@@ -75,7 +75,7 @@ action 'com.openai.chat.AskIntent' askChatGPTApp(text prompt: 'prompt'): text {
 }
 ```
 
-Agent Router should call `askChatGPTApp(...)` anywhere it needs ChatGPT app
+Iris should call `askChatGPTApp(...)` anywhere it needs ChatGPT app
 output.
 
 ## Constraints

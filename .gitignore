@@ -9,3 +9,8 @@ tmp/
 
 # Compiled shortcut artifacts belong in dist/; keep shortcuts/ source-only.
 shortcuts/*.shortcut
+
+# Local personal credentials for local (non-production) builds. NEVER commit.
+# (.env.local.example is the committed template and is intentionally tracked.)
+.env.local
+env.local

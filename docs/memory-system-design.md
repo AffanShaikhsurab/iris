@@ -25,6 +25,24 @@ sources:
 
 # Iris Phone-Local Memory System Design
 
+> **UPDATE 2026-07-06 — IMPLEMENTED, root cause fixed.** The earlier approach in
+> this doc (hand-rolled `action '...'` custom definitions with community-guessed
+> WFKeys) was the bug: keys like `WFShowFilePicker`, `WFFileAppendNewLine`, and
+> `WFDestinationPath` were wrong/ineffective, so the path never got set and
+> **nothing was ever stored** on device. The path also had a bad leading slash
+> (`/Shortcuts/IrisOKF`).
+>
+> **Fix:** `iris.cherri` now uses **Cherri's built-in file actions** via
+> `#include 'actions/documents'` — `createFolder(path)`, `appendToFile(path, &text)`,
+> `getFile(path)` — which emit the correct, maintainer-validated WFKeys
+> (`WFFilePath`, `WFGetFilePath`, `WFAppendFileWriteMode`). The base path is
+> `Shortcuts/IrisOKF` (NO leading slash; resolves under the iCloud Drive
+> Shortcuts sandbox). The setup primer runs `createFolder` then seeds the
+> readable topic files (log/index/profile/preferences) so `getFile` never halts
+> on a missing file. `appendToFile`'s text argument MUST be a variable, not a
+> string literal. Verified in the compiled plist: correct keys present, bad keys
+> absent. Sections below are retained for history.
+
 This is a design document only. It does not modify `shortcuts/iris.cherri` and
 nothing here is compiled. It specifies a **working, hands-free** phone-local
 memory layer for Iris, replacing the aspirational (and never-implemented) OKF

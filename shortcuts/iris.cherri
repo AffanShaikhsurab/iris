@@ -1,3 +1,5 @@
+#include 'actions/documents'
+
 /* Iris
 
    A bounded agentic tool loop implemented inside Apple Shortcuts.
@@ -175,19 +177,12 @@ action 'is.workflow.actions.getcurrentlocation' getAgentCurrentLocation(): text
 
 action 'is.workflow.actions.getdevicedetails' getAgentDeviceDetails(): text
 
-action 'is.workflow.actions.file.getfoldercontents' getAgentFolderContents(text folder: 'WFFolder'): text
-
-action 'is.workflow.actions.documentpicker.open' getAgentFile(text path: 'WFGetFilePath'): text {
-  "WFShowFilePicker": false,
-  "WFFileErrorIfNotFound": false
-}
-
-action 'is.workflow.actions.file.append' appendAgentFile(text content: 'WFInput', text path: 'WFFilePath'): text {
-  "WFAppendFileWriteMode": "Append",
-  "WFFileAppendNewLine": true
-}
-
-action 'is.workflow.actions.file.createfolder' createAgentFolder(text path: 'WFFilePath'): text
+/* Memory (Files) uses Cherri's BUILT-IN file actions - createFolder(path),
+   appendToFile(path, text), getFile(path) - NOT hand-rolled custom actions.
+   The built-ins emit the correct maintainer-validated WFKeys. The earlier
+   custom definitions used guessed keys (WFShowFilePicker, WFFileAppendNewLine,
+   WFDestinationPath) that silently no-opped, so nothing was ever stored. Paths
+   are relative to the iCloud Drive Shortcuts sandbox with NO leading slash. */
 
 /* --- Configuration --- */
 
@@ -199,7 +194,7 @@ action 'is.workflow.actions.file.createfolder' createAgentFolder(text path: 'WFF
 @maxContextExchanges = 4
 /* Phone-local memory folder (OKF). Base path is device-dependent (iCloud Drive
    vs On My iPhone); validate on device and adjust if reads/writes no-op. */
-@memBase = "/Shortcuts/IrisOKF"
+@memBase = "Shortcuts/IrisOKF"
 
 /* --- Loop state --- */
 
@@ -264,13 +259,21 @@ if @primeCount > 0 {
   @primeRem = getAgentUpcomingReminders()
   @primeLoc = getAgentCurrentLocation()
   @primeWx = getAgentCurrentWeather()
-  /* Create the memory folder up front so the first append has a parent folder.
-     Create Folder takes a text path (getfoldercontents does NOT); this also
-     fires the Files permission prompt during setup. */
-  @primeFolder = createAgentFolder("{@memBase}")
-  /* Prime the memory read/write Files permission and seed the folder + log. */
-  @primeMemRead = getAgentFile("{@memBase}/index.md")
-  @primeMemWrite = appendAgentFile("Iris memory initialized. You can delete this line.", "{@memBase}/log.md")
+  /* Create the memory folder first (built-in createFolder takes a text path and
+     runs hands-free), then seed the readable topic files so later getFile calls
+     always find a file and never halt. appendToFile creates the file; it does
+     NOT create the parent folder, hence createFolder first. This also fires the
+     Files permission prompt during setup. */
+  createFolder("{@memBase}")
+  @seedLog = "Iris memory initialized. You can delete this line."
+  appendToFile("{@memBase}/log.md", @seedLog)
+  @seedIndex = "Iris memory index."
+  appendToFile("{@memBase}/index.md", @seedIndex)
+  @seedProfile = "Iris profile notes."
+  appendToFile("{@memBase}/profile.md", @seedProfile)
+  @seedPrefs = "Iris preference notes."
+  appendToFile("{@memBase}/preferences.md", @seedPrefs)
+  @primeMemRead = getFile("{@memBase}/log.md")
   @primeDev = getAgentDeviceDetails()
   @primeDone = "Setup done. If you tapped Always Allow on each, Siri will not ask again. For background use, set Settings, Privacy, Location Services, Shortcuts to Always."
   show("{@primeDone}")
@@ -820,7 +823,7 @@ repeat turn for 50 {
                  not be found"), so notes are saved to the hands-free Files store
                  instead of the Notes app. */
               @noteEntry = "\n\n# {@title}\n{@noteBody}"
-              @noteWrite = appendAgentFile("{@noteEntry}", "{@memBase}/notes.md")
+              appendToFile("{@memBase}/notes.md", @noteEntry)
               @toolResult = "tool=create_note\nok=true\ncount=1\nresult=Saved a note to your Files memory.\nrecords={@noteBody}\nerror="
               @localFinalText = "I saved that note."
             }
@@ -859,7 +862,7 @@ repeat turn for 50 {
               }
               /* Saved to the hands-free Files store (see create_note note). */
               @journalItem = "\n\n{@journalEntry}"
-              @journalWrite = appendAgentFile("{@journalItem}", "{@memBase}/journal.md")
+              appendToFile("{@memBase}/journal.md", @journalItem)
               @toolResult = "tool=quick_journal\nok=true\ncount=1\nresult=Saved a journal entry to your Files memory.\nrecords={@journalEntry}\nerror="
               @localFinalText = "I saved that journal entry."
             }
@@ -1044,7 +1047,7 @@ repeat turn for 50 {
                and handled by the else branch (folder set up, nothing saved yet). */
             if @tool.text == "memory_status" {
               @toolHandled = "yes"
-              @memStatusText = getAgentFile("{@memBase}/log.md")
+              @memStatusText = getFile("{@memBase}/log.md")
               if @memStatusText {
                 @toolResult = "tool=memory_status\nok=true\ncount=1\nresult=Memory is available.\nrecords={@memStatusText}\nerror="
                 @localFinalText = "Your memory is set up and has saved notes."
@@ -1070,7 +1073,7 @@ repeat turn for 50 {
               if @topic.text == "preferences" {
                 @memPath = "{@memBase}/preferences.md"
               }
-              @memReadText = getAgentFile("{@memPath}")
+              @memReadText = getFile("{@memPath}")
               if @memReadText {
                 @toolResult = "tool=memory_read\nok=true\ncount=1\nresult=Read {@topic} memory.\nrecords={@memReadText}\nerror="
                 @localFinalText = "Here is what I have saved: {@memReadText}"
@@ -1081,8 +1084,8 @@ repeat turn for 50 {
             }
 
             /* --- Memory: save info the user wants remembered (append-only) ---
-               appendAgentFile auto-creates the FILE; the parent folder is created
-               once by the setup primer (createAgentFolder). Append-only keeps
+               appendToFile auto-creates the FILE; the parent folder is created
+               once by the setup primer (createFolder). Append-only keeps
                writes safe (no overwrite). */
             if @tool.text == "memory_append" {
               @toolHandled = "yes"
@@ -1096,7 +1099,8 @@ repeat turn for 50 {
               if @topic.text == "preferences" {
                 @memPath = "{@memBase}/preferences.md"
               }
-              @memAppendResult = appendAgentFile("{@body}", "{@memPath}")
+              @memEntry = "\n{@body}"
+              appendToFile("{@memPath}", @memEntry)
               @toolResult = "tool=memory_append\nok=true\ncount=1\nresult=Saved to {@topic} memory.\nrecords={@body}\nerror="
               @localFinalText = "Saved that to your memory."
             }
@@ -1106,7 +1110,7 @@ repeat turn for 50 {
                memory_status: getfoldercontents needs a folder OBJECT. --- */
             if @tool.text == "memory_list" {
               @toolHandled = "yes"
-              @memListText = getAgentFile("{@memBase}/log.md")
+              @memListText = getFile("{@memBase}/log.md")
               if @memListText {
                 @toolResult = "tool=memory_list\nok=true\ncount=1\nresult=Read memory log.\nrecords={@memListText}\nerror="
                 @localFinalText = "Here is what is in your memory log: {@memListText}"
@@ -1124,11 +1128,31 @@ repeat turn for 50 {
             @lastLocalFinalText = "{@localFinalText}"
             @hasLocalFinal = "yes"
 
-            if @returnToAgent.text == "false" {
+            /* Read/list tools already build a complete, human answer that
+               INCLUDES the actual items (task titles, email senders/subjects,
+               events). Speak that directly instead of returning the observation
+               to the planner, which tends to over-compress it into a bare count
+               ("you have 8 tasks") or wrongly say there is nothing. This is
+               deterministic and also skips a model round-trip. */
+            @speakRecords = "no"
+            if @tool.text == "tasks_list"       { @speakRecords = "yes" }
+            if @tool.text == "calendar_lookup"  { @speakRecords = "yes" }
+            if @tool.text == "reminders_lookup" { @speakRecords = "yes" }
+            if @tool.text == "gmail_search"     { @speakRecords = "yes" }
+            if @tool.text == "gmail_read"       { @speakRecords = "yes" }
+            if @tool.text == "memory_read"      { @speakRecords = "yes" }
+            if @tool.text == "memory_list"      { @speakRecords = "yes" }
+
+            if @speakRecords.text == "yes" {
               @finalText = "{@localFinalText}"
               @deliver = "yes"
             } else {
-              @loopContext += "\n\nobservation=\n{@toolResult}"
+              if @returnToAgent.text == "false" {
+                @finalText = "{@localFinalText}"
+                @deliver = "yes"
+              } else {
+                @loopContext += "\n\nobservation=\n{@toolResult}"
+              }
             }
           } else {
             /* Tool budget exhausted: fail closed with the best local result. */

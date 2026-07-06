@@ -194,11 +194,18 @@ general "Hey Siri ..." questions, and the "Hey Siri" wake word itself cannot be
 changed (verified 2026-07). So there is no way to make a bare "Hey Siri, what's
 the weather" route into Iris. What you CAN do:
 
-1. **Vocal Shortcuts (best "just say a word" option).** Settings →
-   Accessibility → Vocal Shortcuts → Set Up Vocal Shortcuts, pick Iris,
-   and record a short custom phrase (for example "assistant" or "computer").
-   After that the phrase runs Iris on-device **without saying "Siri" at
-   all**. It is the closest thing to a custom wake word.
+1. **Vocal Shortcuts (best "just say a word" option).** Skip "Hey Siri" entirely
+   and launch Iris with a single word you choose:
+
+   1. Open **Settings → Accessibility → Speech → Vocal Shortcuts**.
+   2. Tap **Siri Shortcut** (or **Set Up Vocal Shortcuts**).
+   3. Choose **Iris** from your shortcuts list, then tap **Continue**.
+   4. Pick the activation phrase — **Iris** works well, or any short word you
+      like — then tap **Save**.
+
+   The next time, say that word alone (for example **"Iris"**) and iOS runs the
+   shortcut directly — no **"Hey Siri, Iris"** prefix. This is the closest thing
+   to a custom wake word on iPhone.
 2. **Rename to a shorter phrase.** Change `#define name Iris` to a short,
    natural word (for example `#define name Assistant`), rebuild, and re-import.
    Then "Hey Siri, Assistant" is all you say. Keep it distinct from Apple's own

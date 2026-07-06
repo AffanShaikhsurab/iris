@@ -299,9 +299,7 @@ function tasksList(req) {
   var res = Tasks.Tasks.list(listId, { showCompleted: false, maxResults: 100 });
   var items = res.items || [];
   var open = items.filter(function (t) { return t.status !== 'completed'; });
-  var records = open.map(function (t) {
-    return '- ' + t.title + ' (' + (t.status || 'needsAction') + ')';
-  }).join('; ');
+  var records = open.map(function (t) { return t.title; }).join('; ');
   var msg = 'You have ' + open.length + ' open task' + (open.length === 1 ? '' : 's') + '.';
   return _env('tasks_list', true, open.length, msg, records, '');
 }
@@ -389,11 +387,13 @@ function gmailSearch(req) {
   var rows = [];
   for (var i = 0; i < threads.length; i++) {
     var m = threads[i].getMessages()[0];
-    rows.push('from=' + m.getFrom() + '; subject=' + m.getSubject() +
-      '; snippet=' + _clip(threads[i].getMessages()[0].getPlainBody(), 160));
+    // Voice-friendly: sender name + subject only (Iris reads records aloud).
+    // Use gmail_read for the full body of a specific message.
+    var from = m.getFrom().replace(/<[^>]*>/g, '').replace(/"/g, '').trim();
+    rows.push('From ' + from + ': ' + m.getSubject());
   }
-  var msg = 'Found ' + threads.length + ' matching email' + (threads.length === 1 ? '' : 's') + '.';
-  return _env('gmail_search', true, threads.length, msg, rows.join(' || '), '');
+  var msg = 'You have ' + threads.length + ' matching email' + (threads.length === 1 ? '' : 's') + '.';
+  return _env('gmail_search', true, threads.length, msg, rows.join('; '), '');
 }
 
 function gmailRead(req) {

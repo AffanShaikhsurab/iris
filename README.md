@@ -75,7 +75,9 @@ Shortcuts. See [supported routes](docs/routes.md).
    paste a free `nvapi-` key into the first Text action. Full walkthrough:
    [configuration guide](docs/configuration.md).
 3. **Run setup once** — say **"setup"** when prompted and tap **Always Allow**.
-4. **Use it** — **"Hey Siri, Iris"** → ask for anything.
+4. **Use it** — **"Hey Siri, Iris"** → ask for anything. Optional: set up a
+   [Vocal Shortcut](docs/configuration.md#invocation-launching-without-saying-iris)
+   so you can say **"Iris"** alone, with no "Hey Siri" prefix.
 
 ### Build from source (developers)
 

@@ -18,6 +18,9 @@ manual validation.
 - [ ] Unsigned shortcut import behavior is recorded, if tested.
 - [ ] Shortcut appears as `Iris`.
 - [ ] Siri can start it with "Hey Siri, Iris."
+- [ ] Optional: Vocal Shortcut (Settings → Accessibility → Speech → Vocal
+  Shortcuts → Siri Shortcut → Iris) launches with the chosen phrase alone (e.g.
+  "Iris") without "Hey Siri."
 
 ## Configuration Tests
 

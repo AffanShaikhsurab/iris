@@ -58,11 +58,11 @@ manual validation.
 - [ ] `summarize_provided_text`: pasted text is summarized; private app data is
   not assumed when no text is provided.
 - [ ] `draft_reply`: a reply is drafted for review and is not sent.
-- [ ] `create_note`: Notes permission prompt appears if needed; note creation
-  imports and runs without "action couldn't be found."
+- [ ] `create_note`: note is appended to `/Shortcuts/IrisOKF/notes.md` in Files
+  and runs without "action couldn't be found."
 - [ ] `create_reminder`: Reminders permission prompt appears if needed; reminder
   creation imports and runs without "action couldn't be found."
-- [ ] `quick_journal`: creates a journal-style Apple Note from dictated text.
+- [ ] `quick_journal`: appends a journal entry to `/Shortcuts/IrisOKF/journal.md`.
 - [ ] `calendar_lookup`: Calendar permission prompt appears if needed; upcoming
   events are fetched as structured title/start/end/calendar lines and
   summarized by the model. Record if duplicate calendars produce repeated events.
@@ -113,9 +113,9 @@ for tools that are documented but not yet wired in.
 | `web_search` | "When is the next FIFA World Cup match?" | Routes to Tavily (if a key is set) and returns a current answer. |
 | `summarize_provided_text` | "Summarize this text: The project kickoff is Monday and the design review is Wednesday." | Model summarizes only the provided text. |
 | `draft_reply` | "Draft a friendly reply saying I can join tomorrow at 3." | Reply text is drafted for review. |
-| `create_note` | "Create a note called Product Ideas with three ideas for Iris." | A Notes action runs and creates a note. |
+| `create_note` | "Create a note called Product Ideas with three ideas for Iris." | The note is appended to `/Shortcuts/IrisOKF/notes.md` in Files. |
 | `create_reminder` | "Remind me to call mom tomorrow at 6 PM." | Reminder action runs; date/time is recorded in notes until due-date support is validated. |
-| `quick_journal` | "Journal that today I tested Iris and fixed shortcut syntax." | A journal-style Apple Note is created. |
+| `quick_journal` | "Journal that today I tested Iris and fixed shortcut syntax." | A journal entry is appended to `/Shortcuts/IrisOKF/journal.md` in Files. |
 | `calendar_lookup` | "What meetings do I have today?" | Upcoming calendar events are fetched as structured details, sent to the model, and summarized. |
 | `reminders_lookup` | "What reminders are coming up?" | Upcoming reminders are fetched and summarized. |
 | `open_search` | "Search YouTube for best iPhone shortcuts." | Approved YouTube search URL opens. |
@@ -139,9 +139,9 @@ tools reuse that same call rather than a ChatGPT App Intent.
 | `web_search` | Tavily search (`api.tavily.com`) | Tavily key, network | |
 | `summarize_provided_text` | NIM chat completion | NVIDIA key, network | |
 | `draft_reply` | NIM chat completion | NVIDIA key, network | |
-| `create_note` | NIM + Notes Create Note | NVIDIA key, Notes | |
+| `create_note` | NIM + Files Append | NVIDIA key, Files | |
 | `create_reminder` | Reminders Add New Reminder | Reminders | |
-| `quick_journal` | NIM + Notes Create Note | NVIDIA key, Notes | |
+| `quick_journal` | NIM + Files Append | NVIDIA key, Files | |
 | `calendar_lookup` | Calendar Get Upcoming Events | Calendar | |
 | `reminders_lookup` | Reminders Get Upcoming Reminders | Reminders | |
 | `open_search` | Open URL with allowlisted template | Browser/app handoff | |

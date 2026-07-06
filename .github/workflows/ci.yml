@@ -1,0 +1,44 @@
+name: CI
+
+on:
+  push:
+    branches: ["main"]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  compile:
+    name: Compile Cherri shortcut
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Go
+        uses: actions/setup-go@v6
+        with:
+          go-version: "1.23"
+
+      - name: Install Cherri
+        run: go install github.com/electrikmilk/cherri@latest
+
+      - name: Compile shortcut
+        run: |
+          export PATH="$HOME/go/bin:$PATH"
+          bash scripts/build-shortcuts.sh --debug
+
+      - name: Validate shortcut structure
+        run: |
+          export PATH="$HOME/go/bin:$PATH"
+          bash scripts/build-shortcuts.sh --skip-sign
+          python3 scripts/validate-shortcut.py "dist/Iris_unsigned.shortcut"
+
+      - name: Upload compile artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: iris-unsigned
+          path: dist/iris.shortcut
+          if-no-files-found: error
+          retention-days: 7

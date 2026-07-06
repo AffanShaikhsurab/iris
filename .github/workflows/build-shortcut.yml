@@ -1,0 +1,75 @@
+name: Build Shortcut
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - "v*"
+
+jobs:
+  build:
+    name: Compile and sign shortcut
+    runs-on: macos-15
+    permissions:
+      contents: read
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Go
+        uses: actions/setup-go@v6
+        with:
+          go-version: "1.23"
+
+      - name: Install Cherri
+        run: go install github.com/electrikmilk/cherri@latest
+
+      - name: Compile shortcut
+        run: |
+          export PATH="$HOME/go/bin:$PATH"
+          bash scripts/build-shortcuts.sh --debug
+
+      - name: Inspect Cherri artifact
+        id: inspect
+        run: |
+          python3 - <<'PY' >> "$GITHUB_OUTPUT"
+          from pathlib import Path
+          p = Path("dist/Iris.shortcut")
+          header = p.read_bytes()[:4]
+          print(f"header={header.decode('latin1')}")
+          print(f"size={p.stat().st_size}")
+          PY
+
+      - name: Attempt Apple Shortcuts signing
+        id: sign
+        if: steps.inspect.outputs.header != 'AEA1'
+        continue-on-error: true
+        run: |
+          set -o pipefail
+          shortcuts sign --mode anyone \
+            --input "dist/Iris.shortcut" \
+            --output "dist/Iris.signed.shortcut" \
+            2>&1 | tee dist/signing-output.log
+
+      - name: Record signing result
+        run: |
+          if [ "${{ steps.inspect.outputs.header }}" = "AEA1" ]; then
+            echo "Cherri produced an already signed/package-formatted shortcut (AEA1 header)." > dist/signing-result.txt
+          elif [ -f "dist/Iris.signed.shortcut" ]; then
+            echo "Signing succeeded." > dist/signing-result.txt
+          else
+            echo "Signing failed. See workflow logs for the output from shortcuts sign." > dist/signing-result.txt
+          fi
+          cat dist/signing-result.txt
+
+      - name: Upload shortcut artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: iris-shortcut
+          path: |
+            dist/Iris.shortcut
+            dist/Iris.signed.shortcut
+            dist/signing-result.txt
+            dist/signing-output.log
+          if-no-files-found: warn
+          retention-days: 30

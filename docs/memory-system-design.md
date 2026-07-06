@@ -147,12 +147,23 @@ This is the **recommended write path** for Iris memory: it is append-only (the
 safety default OKF asks for), it self-heals a missing file/folder file, and it
 carries a fixed path so it never prompts.
 
-### 2.4 List a folder (already implemented)
+### 2.4 Listing a folder — DO NOT use a text path (device-confirmed failure)
 
-Action: `is.workflow.actions.file.getfoldercontents`, param `WFFolder` (text
-path). Already wired as `getAgentFolderContents(text folder: 'WFFolder')`. This
-is the reliable, non-interactive lister and also the backbone of `memory_search`
-(2.5).
+Action: `is.workflow.actions.file.getfoldercontents`, param `WFFolder`. This was
+originally assumed to accept a text path, but on device it **requires a folder
+OBJECT** (a value piped from another action). Passing a text path such as
+`/Shortcuts/IrisOKF` throws the runtime error **"File Is Not a Folder — Please
+pass a folder to the Get Folder Contents action instead of a standard file"**,
+which halts the run. This was the root cause of on-device memory failure: the
+permission primer and `memory_status`/`memory_list` all called it with a text
+path, so the primer halted before seeding the folder and nothing persisted.
+
+**Fix (implemented):** stop calling `getfoldercontents` with a text path. Ensure
+the folder exists with **Create Folder** (`is.workflow.actions.file.createfolder`,
+param `WFFilePath`), which *does* take a text path and runs hands-free; and
+implement `memory_status`/`memory_list` by reading the log file with Get File
+(2.1) instead of listing the folder. To enumerate a folder later, obtain a
+folder object upstream and pipe it into `WFFolder`.
 
 ### 2.5 Search Files (App Intent) — experimental only
 
@@ -395,9 +406,11 @@ if @tool.text == "memory_append" {
 
 ### 5.6 `memory_list`
 - Arguments: none.
-- Dispatch: `@memList = getAgentFolderContents("Shortcuts/IrisOKF")` then count.
-- Envelope: `tool=memory_list / ok=true / count=<n> / result=Listed memory files. / records=<folder contents> / error=`
-- localFinalText: "Your memory has <n> items."
+- Dispatch (implemented): `@memListText = getAgentFile("/Shortcuts/IrisOKF/log.md")`
+  then branch on truthiness. Does **not** use `getfoldercontents` (see 2.4).
+- Envelope (has content): `tool=memory_list / ok=true / count=1 / result=Read memory log. / records=<log text> / error=`
+- Envelope (empty): `ok=true / count=0 / result=Memory log is empty.`
+- localFinalText: "Here is what is in your memory log: <text>" / "Your memory log is empty so far."
 
 ### 5.7 `memory_search`
 - Arguments: `query`.
@@ -410,10 +423,12 @@ if @tool.text == "memory_append" {
 - Envelope (miss): `ok=false / count=0 / error=No memory matched that query.`
 - localFinalText: "I found <n> things in memory about <query>." / "I did not find anything in memory about <query>."
 
-### 5.8 `memory_status` (keep)
-Unchanged: `getAgentFolderContents("/Shortcuts/IrisOKF")` + count. It doubles as
-the readability probe. (Reconcile its leading-slash path with the validated base
-from 7.1 so status and the other tools agree.)
+### 5.8 `memory_status` (implemented)
+Reads the log file with Get File (`getAgentFile("/Shortcuts/IrisOKF/log.md")`)
+and reports whether memory has content — it does **not** list the folder (see
+2.4, which caused the "File Is Not a Folder" halt). Envelope:
+`tool=memory_status / ok=true / count=1 / result=Memory is available. / records=<log text> / error=`
+when the log has content, else `count=0 / result=Memory is set up but empty.`
 
 ### 5.9 Unknown-tool behavior
 The existing `@toolHandled == "no"` fallthrough already returns a controlled

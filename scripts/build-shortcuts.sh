@@ -35,9 +35,8 @@ if env_path.exists():
     mapping = {
         "nvapi-REPLACE-ME": env.get("NIM_API_KEY", ""),
         "tvly-REPLACE-ME": env.get("TAVILY_KEY", ""),
-        "google-client-id-REPLACE-ME": env.get("GOOGLE_CLIENT_ID", ""),
-        "google-client-secret-REPLACE-ME": env.get("GOOGLE_CLIENT_SECRET", ""),
-        "google-refresh-token-REPLACE-ME": env.get("GOOGLE_REFRESH_TOKEN", ""),
+        "https://script.google.com/macros/s/REPLACE-ME/exec": env.get("IRIS_PROXY_URL", ""),
+        "iris-proxy-secret-REPLACE-ME": env.get("IRIS_PROXY_SECRET", ""),
     }
     injected = 0
     for placeholder, value in mapping.items():

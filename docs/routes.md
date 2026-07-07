@@ -134,6 +134,31 @@ Prompt user
      show it on screen and stop
 ```
 
+## Proactive Modes (Automation)
+
+Iris also runs **proactively** from an iOS Time-of-Day Automation, not only from
+voice. The mode is read from the shortcut's input (`ShortcutInput`); an empty
+input is the normal interactive `chat` mode and the voice loop above is
+unchanged.
+
+- `morning` — a proactive **compute → persist → notify** run (no `Ask for Input`,
+  no Siri speech, because a scheduled run fires while the phone is usually locked
+  and interactive actions do not complete there). It gathers local memory
+  (`profile`/`preferences`), upcoming Calendar events, upcoming Reminders, and
+  open Google Tasks (proxy), makes ONE model call for a short plain-text
+  briefing, persists it to the `log` topic via the same write-through path as
+  `memory_append` (the hand-off an attended run reads back), and delivers it with
+  `showAgentNotification` (`is.workflow.actions.notification`). Fail-open at every
+  step. Implemented in `shortcuts/iris.cherri`; **on-device validation required**
+  (automation input → `ShortcutInput`, the notification WFKeys, and unattended
+  network access). See `docs/proactive-agents-plan.md`.
+- `evening`, `weekly` — planned (Phases 5–6 in the plan); not yet recognized, so
+  such input currently falls back to `chat`.
+
+Setup: Shortcuts → Automation → New → Time of Day → run Iris passing `morning` as
+input, with "Ask Before Running" off. Prime permissions with a manual "setup" run
+first (`docs/configuration.md`).
+
 ## Route Hardening Rules
 
 - Do not add a native route unless the Shortcuts action or app intent is verified

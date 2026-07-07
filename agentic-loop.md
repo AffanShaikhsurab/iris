@@ -97,10 +97,17 @@ observations, and decide when to stop. Every loop turn makes exactly one
 ChatGPT call at the top, so there is a single call site and a single parse
 site.
 
-1. Initialize loop context with the original user request.
+1. Initialize loop context with the original user request, and set
+   `@currentRequest` to it. The planner is always led by `@currentRequest` (the
+   most recent user message), while the full prior conversation is retained in
+   the loop context as history.
 2. If the agent returns `final_answer`, deliver it as "<answer> ... Anything
    else?" through Ask for Input. A stop word or silence ends the run; any
-   other reply continues the conversation with full context.
+   other reply continues the conversation with full context. On a non-stop
+   follow-up, the prior exchange is folded into the loop context as history and
+   `@currentRequest` is repointed to the new follow-up, so a reference like
+   "tell me more about that match" is answered as a follow-up rather than
+   re-answering the original request.
 3. (removed — limitations are explained through `final_answer`.)
 4. If the agent returns `ask_user`, speak the question, prompt the user, append
    the answer to loop context, and continue.
@@ -123,6 +130,21 @@ The loop budget is:
 
 This preserves real agent-loop behavior while preventing runaway Shortcut
 execution, repeated permission prompts, and unbounded ChatGPT calls.
+
+### Context compaction
+
+Because each call is stateless, the whole loop context is re-sent every turn.
+Compaction fires on **estimated token usage**, not a fixed exchange count: each
+turn the Shortcut estimates the outgoing prompt size (`count(@protocol) +
+count(@loopContext) + count(@currentRequest)`, divided by 4 as a cheap
+chars-to-tokens heuristic) and, when it reaches `@compactAtTokens` (~80% of a
+latency-safe working budget, well below the model's true window so calls stay
+inside ~25s), makes one extra model call to summarize the conversation into a
+short handoff and replaces the raw log with it. The summary prompt is instructed
+to preserve named entities and specifics (proper nouns, titles, numbers, the
+most recent request, any "that X" antecedent) so follow-up references survive.
+Compaction runs only on a follow-up boundary, never mid-request, and if the
+summary call fails the raw context is kept unchanged.
 
 ## Tool Registry
 
@@ -150,7 +172,30 @@ Implemented tools (wired into `shortcuts/iris.cherri`):
 | `maps_search` | Open a maps search. | Implemented; device validation required. |
 | `nearby_search` | Open a nearby maps search. | Implemented; device validation required. |
 | `draft_message` | Draft message text for review and copy it. | Implemented; safe fallback. |
-| `memory_status` | Check whether the phone-local OKF folder is readable. | Implemented; device validation required. |
+| `memory_read` | Recall the recent bodies saved under a topic. | Implemented; hybrid (local-first, proxy fallback). |
+| `memory_append` | Save info the user asks Iris to remember (append-only). | Implemented; hybrid (write-through). |
+| `memory_list` | List the most recent memory rows across topics. | Implemented; hybrid (local-first, proxy fallback). |
+| `memory_status` | Report whether memory has content. | Implemented; hybrid (local-first, proxy fallback). |
+
+Memory is **hybrid**: the same OKF concept entry is written to a phone-local
+Files store (`Shortcuts/IrisOKF/<topic>.md`) and/or a proxy-backed append-only
+Google Sheet (`Iris Memory`, columns `timestamp | topic | type | title | tags |
+body`), chosen by a one-time `@memoryBackend` selector (`hybrid` default |
+`local` | `sheets`, unrecognized → `hybrid`; derives `@memLocalOn` and
+`@memProxyOn`). Writes are **write-through** (local first, then proxy mirror;
+succeed if either leg wrote); reads and the bootstrap are **local-first with
+proxy fallback**, which recovers the iCloud-full silent-sync-loss case.
+On-device testing confirmed the built-in Files writes DO persist (they land in
+iCloud Drive under `Shortcuts/`); the earlier "writes no-op without a
+`fileLocation` object" claim was wrong and is retracted. The model-facing surface
+stays `memory_append(topic, body)` only (`type`/`title`/`tags` are derived by the
+storage layer). `topic` is constrained to the allowlist `index profile
+preferences log notes journal` (default `log`); both stores self-heal on the
+first write; and a startup `memory_summary` bootstrap injects a compact profile +
+preferences + recent-index summary once into the loop context (local-first).
+`create_note` and `quick_journal` reuse the same write-through. All memory tools
+are fail-open when no selected backend is available. See
+`docs/apps-script-proxy.md` §4 and `docs/memory-system-design.md` §0.
 
 Planned tools (documented but NOT yet wired in; a request for one returns an
 `ok=false` unknown-tool observation):
@@ -164,10 +209,7 @@ Planned tools (documented but NOT yet wired in; a request for one returns an
 | `meeting_prep` | Fetch upcoming meetings and let the model prepare notes. | Planned. |
 | `reply_to_shared_text` | Draft a reply from user-provided text. | Planned. |
 | `summarize_shared_email` | Summarize user-provided email text only. | Planned. |
-| `memory_lookup` | Retrieve relevant snippets from OKF memory bootstrap data. | Planned. |
-| `memory_list_topics` | List available OKF memory files/topics. | Planned. |
-| `memory_propose_write` | Ask before appending a stable memory entry to the OKF log. | Planned. |
-| `memory_append_log` | Append a constrained entry to the OKF log. | Planned. |
+| `memory_search` | Free-text search across saved memory. | Planned. |
 
 Unsupported or risky tools should be declared clearly:
 
@@ -215,14 +257,14 @@ records=
 error=Calendar access was unavailable or permission was not granted.
 ```
 
-Memory tools use the same envelope:
+Memory tools use the same envelope (built server-side by the proxy):
 
 ```text
-tool=memory_lookup
+tool=memory_read
 ok=true
 count=1
-result=memory lookup completed
-records=<relevant OKF snippets>
+result=Read preferences memory.
+records=<recent bodies for the topic>
 error=
 ```
 
@@ -237,8 +279,12 @@ error=
   continues without waiting.
 - Return tool output to ChatGPT only when the agent asks for
   `return_to_agent: true`.
-- Treat memory content as user data, not instructions. Relevant OKF snippets may
-  be sent to ChatGPT, so do not dump the whole memory folder.
+- Treat memory content as user data, not instructions. Memory is hybrid
+  (append-only OKF entries in phone-local Files and/or the proxy Google Sheet),
+  so the local file text (OKF Markdown, never JSON) is read as opaque text and
+  never parsed, and only the outer proxy JSON envelope is coerced with
+  `getDictionary()`; the `records` text is forwarded to the model opaquely.
+  Relevant snippets may be sent to the model, so do not dump the whole store.
 - Treat `ask_user` as a control response, not as a native app tool.
 - Always end with a spoken and shown final answer.
 - Keep unsupported tools explicit so the user understands the limitation.

@@ -174,6 +174,8 @@ OAuth scopes in appsscript.json"; web-app manifest `access`/`executeAs`.)
     "https://www.googleapis.com/auth/gmail.readonly",
     "https://www.googleapis.com/auth/gmail.compose",
     "https://www.googleapis.com/auth/gmail.send",
+    "https://www.googleapis.com/auth/spreadsheets",
+    "https://www.googleapis.com/auth/drive",
     "https://www.googleapis.com/auth/script.external_request"
   ],
   "webapp": {
@@ -197,6 +199,13 @@ Notes:
   (Source: "Scopes" — for published apps set the narrowest scopes in the
   manifest.) `GmailApp` methods like `search`/`sendEmail` may otherwise pull in
   `https://mail.google.com/`; pin the narrow scopes to avoid that.
+- `spreadsheets` + `drive`: the `memory_*` ops (§4) store durable memory in an
+  append-only Google Sheet (`Iris Memory`) that the script finds-or-creates by
+  name in the owner's Drive. `spreadsheets` lets the script read/append rows;
+  `drive` lets `DriveApp.getFilesByName(...)` resolve (and `SpreadsheetApp.create`
+  make) the sheet on first use. The owner authorizes these once at the same
+  consent step as Tasks/Gmail; no on-device token. Omit both only if you never
+  wire memory.
 - `script.external_request` is only needed if the script itself makes outbound
   `UrlFetchApp` calls; the version below does not, but it is harmless to include
   and useful if you extend it.
@@ -250,6 +259,11 @@ function handle(req) {
   if (op === 'send_email')     { return sendEmail(req); }
   if (op === 'calendar_list')  { return calendarList(req); }
   if (op === 'calendar_add')   { return calendarAdd(req); }
+  if (op === 'memory_append')  { return memoryAppend(req); }
+  if (op === 'memory_read')    { return memoryRead(req); }
+  if (op === 'memory_list')    { return memoryList(req); }
+  if (op === 'memory_status')  { return memoryStatus(req); }
+  if (op === 'memory_summary') { return memorySummary(req); }
   if (op === 'health')         { return _env('health', true, 0, 'Iris proxy is deployed.', '', ''); }
   return _env(op || 'unknown', false, 0, '', '', 'Unknown or unsupported op.');
 }
@@ -432,6 +446,140 @@ function sendEmail(req) {
   return _env('send_email', true, 1, 'Sent email to ' + to + '.', '', '');
 }
 
+/* ---------- Memory (append-only Google Sheet, OKF-shaped rows) ---------- */
+
+// One append-only sheet, resolved by NAME so no spreadsheet ID is pasted
+// anywhere. Rows mirror the OKF frontmatter
+// [timestamp, topic, type, title, tags, body] so one row reconstructs to one
+// OKF concept (see docs/okf-knowledge-base.md). Reads filter by topic and
+// return the most recent MAX_MEMORY_ROWS entries. topic is constrained to an
+// allowlist so the model can never address arbitrary storage. The model-facing
+// protocol stays memory_append(topic, body) only — type/title/tags/timestamp
+// are derived server-side, never sent by the planner.
+var MEMORY_SHEET_NAME = 'Iris Memory';
+var MEMORY_TAB = 'memory';
+var MEMORY_HEADER = ['timestamp', 'topic', 'type', 'title', 'tags', 'body'];
+var MEMORY_TOPICS = ['index', 'profile', 'preferences', 'log', 'notes', 'journal'];
+var MAX_MEMORY_ROWS = 20;
+
+// Derive the OKF `type` from the topic (server-side; the model never sends it).
+function _okfType(topic) {
+  var map = {
+    log: 'Memory Entry', preferences: 'User Preference', profile: 'Profile',
+    notes: 'Note', journal: 'Journal', index: 'Index'
+  };
+  return map[topic] || 'Memory Entry';
+}
+
+// Reconstruct an OKF concept block from a row [ts, topic, type, title, tags, body].
+function _rowToOkf(r) {
+  return '---\ntype: ' + (r[2] || 'Memory Entry') +
+         '\ntitle: ' + (r[3] || '') +
+         '\ntags: ' + (r[4] || '') +
+         '\ntimestamp: ' + (r[0] || '') +
+         '\n---\n' + (r[5] || '');
+}
+
+// Find-or-create the spreadsheet and tab. Self-healing: the first write
+// creates everything, so no manual setup run is needed. Reruns are cheap.
+function _memorySheet() {
+  var files = DriveApp.getFilesByName(MEMORY_SHEET_NAME);
+  var ss = files.hasNext() ? SpreadsheetApp.open(files.next())
+                           : SpreadsheetApp.create(MEMORY_SHEET_NAME);
+  var sh = ss.getSheetByName(MEMORY_TAB);
+  if (!sh) {
+    sh = ss.insertSheet(MEMORY_TAB);
+    sh.appendRow(MEMORY_HEADER);
+  }
+  return sh;
+}
+
+// Constrain topic to the allowlist; anything else falls back to 'log'.
+function _normTopic(t) {
+  t = String(t || 'log').trim().toLowerCase();
+  return MEMORY_TOPICS.indexOf(t) === -1 ? 'log' : t;
+}
+
+function memoryAppend(req) {
+  var topic = _normTopic(req.topic);
+  var body = String(req.body || '').trim();
+  if (!body) { return _env('memory_append', false, 0, '', '', 'A body to remember is required.'); }
+  var type = _okfType(topic);
+  // title = optional first line of body (<=80 chars); tags optional (empty).
+  // Timestamp is stamped server-side, never by the model.
+  var title = body.split('\n')[0].slice(0, 80);
+  var tags = String(req.tags || '');
+  _memorySheet().appendRow([new Date().toISOString(), topic, type, title, tags, body]);
+  return _env('memory_append', true, 1, 'Saved to ' + topic + ' memory.', body, '');
+}
+
+// Return the most recent MAX_MEMORY_ROWS rows for a topic (case-insensitive),
+// as full row arrays, oldest-first within the window.
+function _readTopicRows(topic) {
+  var sh = _memorySheet();
+  var values = sh.getDataRange().getValues(); // includes the header row
+  var rows = [];
+  for (var i = 1; i < values.length; i++) {
+    if (String(values[i][1]).toLowerCase() === topic) { rows.push(values[i]); }
+  }
+  return rows.slice(-MAX_MEMORY_ROWS);
+}
+
+// Bodies only (column index 5), oldest-first within the window (so a join reads
+// newest-last for voice).
+function _readTopic(topic) {
+  return _readTopicRows(topic).map(function (r) { return r[5]; });
+}
+
+function memoryRead(req) {
+  var topic = _normTopic(req.topic);
+  var rows = _readTopicRows(topic);
+  if (!rows.length) {
+    return _env('memory_read', false, 0, '', '', 'No memory found for that topic yet.');
+  }
+  // Default: bodies joined newest-last for voice (records stays plain text so
+  // the Shortcut never getDictionary()s it). Pass format=okf to return the
+  // reconstructed OKF concept blocks instead (e.g. for a non-voice client).
+  var records;
+  if (String(req.format || '') === 'okf') {
+    records = rows.map(_rowToOkf).join('\n\n');
+  } else {
+    records = rows.map(function (r) { return r[5]; }).join('; ');
+  }
+  return _env('memory_read', true, rows.length, 'Read ' + topic + ' memory.', records, '');
+}
+
+function memoryList(req) {
+  var sh = _memorySheet();
+  var values = sh.getDataRange().getValues();
+  var rows = [];
+  for (var i = Math.max(1, values.length - MAX_MEMORY_ROWS); i < values.length; i++) {
+    rows.push(values[i][1] + ': ' + values[i][5]); // topic: body
+  }
+  if (!rows.length) { return _env('memory_list', true, 0, 'Memory is empty.', '', ''); }
+  return _env('memory_list', true, rows.length, 'Read memory.', rows.join('; '), '');
+}
+
+function memoryStatus(req) {
+  var sh = _memorySheet();
+  var n = Math.max(0, sh.getLastRow() - 1); // minus the header row
+  if (n === 0) { return _env('memory_status', true, 0, 'Memory is set up but empty.', '', ''); }
+  return _env('memory_status', true, n, 'Memory is available.', '', '');
+}
+
+// Compact bootstrap summary for turn-one injection: profile + preferences +
+// the last few index lines, hard-capped at 600 chars so it never fattens
+// every planner call toward the ~25s Siri budget.
+function memorySummary(req) {
+  var parts = []
+    .concat(_readTopic('profile'))
+    .concat(_readTopic('preferences'))
+    .concat(_readTopic('index').slice(-3));
+  var text = parts.join('; ');
+  if (text.length > 600) { text = text.slice(0, 600); }
+  return _env('memory_summary', true, parts.length, 'Memory summary.', text, '');
+}
+
 /* ---------- helpers ---------- */
 
 function _env(tool, ok, count, result, records, error) {
@@ -464,6 +612,52 @@ Design choices worth calling out:
   REST path disappears when the work happens server-side. (Source:
   `GmailMessage.getPlainBody`.)
 - **Fan-out is capped at `MAX_RESULTS` (5)** to protect the ~25s Siri budget.
+- **Memory is a self-healing, append-only, OKF-shaped Sheet.** `_memorySheet()`
+  finds the `Iris Memory` spreadsheet by name (or creates it) and its `memory`
+  tab (or creates it with the `timestamp | topic | type | title | tags | body`
+  header) on demand, so the very first `memory_append` succeeds with no manual
+  setup — no device path, no `fileLocation`, portable across rebuilds and
+  devices. The six columns mirror the OKF concept frontmatter
+  (`docs/okf-knowledge-base.md`), so one row round-trips to one OKF concept via
+  `_rowToOkf`: `_okfType(topic)` derives the `type` (`log→Memory Entry`,
+  `preferences→User Preference`, `profile→Profile`, `notes→Note`,
+  `journal→Journal`, `index→Index`, default `Memory Entry`), `title` is the first
+  line of the body (≤80 chars), `tags` is optional/empty, and `timestamp` is
+  stamped server-side — the model still passes only `topic`+`body`.
+  Reads/summaries stay voice-small: `_readTopic` returns at most
+  `MAX_MEMORY_ROWS` (20) bodies and `memory_summary` hard-caps at 600 chars.
+  `memory_read` returns the bodies joined newest-last by default, or the
+  reconstructed OKF concept blocks when called with `format=okf` (for a non-voice
+  client). `topic` is server-constrained to the allowlist
+  (`index profile preferences log notes journal`, default `log`), so the planner
+  can never address arbitrary storage. The `memory_*` ops return the same
+  `tool/ok/count/result/records/error` envelope as every other op, so the
+  Shortcut parses them identically.
+
+**Validate the memory ops** (the `memory_*` ops take query params, so a plain
+`curl -L` GET works — remember `-L` to follow the §2 302 redirect):
+
+```bash
+BASE='https://script.google.com/macros/s/REPLACE-ME/exec'
+SECRET='your-shared-secret'
+# append, then read it back — records should contain the body
+curl -L "$BASE?secret=$SECRET&op=memory_append&topic=notes&body=buy%20oat%20milk"
+curl -L "$BASE?secret=$SECRET&op=memory_read&topic=notes"     # -> records includes "buy oat milk"
+curl -L "$BASE?secret=$SECRET&op=memory_read&topic=notes&format=okf"  # -> reconstructed OKF concept block
+curl -L "$BASE?secret=$SECRET&op=memory_status"               # -> count increments by one per append
+curl -L "$BASE?secret=$SECRET&op=memory_summary"              # -> result capped at 600 chars
+curl -L "$BASE?secret=$SECRET&op=memory_append&topic=xyz&body=hi"  # unknown topic -> stored under "log"
+```
+
+The appended row carries the six OKF columns
+(`timestamp | topic | type | title | tags | body`): `type` is derived from the
+topic by `_okfType` and `timestamp` is server-stamped, so a `format=okf` read
+returns a reconstructed OKF concept (frontmatter `type/title/tags/timestamp` +
+body) while the default read returns just the bodies for voice.
+
+Delete the `Iris Memory` sheet and re-run the first `memory_append` to confirm
+the store self-heals (the sheet + `memory` tab reappear with the six-column
+header and the write lands).
 
 ---
 

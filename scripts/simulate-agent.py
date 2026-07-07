@@ -46,18 +46,25 @@ import urllib.request
 
 # --- Constants copied VERBATIM from shortcuts/iris.cherri ---
 NIM_URL = "https://integrate.api.nvidia.com/v1/chat/completions"
-DEFAULT_MODEL = "meta/llama-3.1-8b-instruct"
+# Mirrors iris.cherri @nimModelIdRaw: a capable, non-reasoning instruct model.
+DEFAULT_MODEL = "meta/llama-4-maverick-17b-128e-instruct"
 MAX_TURNS = 50
 MAX_TOOL_CALLS = 3
 MAX_USER_QUESTIONS = 2
-# Compact the running conversation into a summary after this many follow-ups.
-MAX_CONTEXT_EXCHANGES = 4
+# Token-based compaction (mirrors iris.cherri @modelContextTokens /
+# @contextTokenBudget / @compactAtTokens). The running context is compacted when
+# the estimated token usage (chars / 4 over protocol + context + current
+# request) reaches ~80% of the latency-safe working budget, NOT on a fixed
+# follow-up-exchange count.
+MODEL_CONTEXT_TOKENS = 128000
+CONTEXT_TOKEN_BUDGET = 12000
+COMPACT_AT_TOKENS = 9600
 COMPACT_SYSTEM = (
     "You compress a running voice-assistant conversation into a short handoff so "
-    "it can continue seamlessly. Preserve the user's overall goal, key facts or "
-    "results already given, any correction or preference the user stated, and "
-    "especially the user's MOST RECENT request. Plain text, under 90 words, no "
-    "markdown, no JSON."
+    "it can continue seamlessly. Preserve the user's overall goal, the MOST "
+    "RECENT request, and every named entity or specific needed to resolve later "
+    "references - proper nouns, titles, people, places, dates, numbers, and any "
+    "'that X' antecedent. Plain text, under 90 words, no markdown, no JSON."
 )
 NIM_ERROR_TEXT = (
     "I could not reach the NVIDIA model. Please check the API key, the model id, "
@@ -121,7 +128,7 @@ PROTOCOL = (
     "memory_read(topic) recalls saved info, "
     "memory_append(topic,body) saves info the user asks you to remember, "
     "memory_list(no args), memory_status(no args). memory topic is one of index "
-    "profile preferences log (default log); call memory_append whenever the user "
+    "profile preferences log notes journal (default log); call memory_append whenever the user "
     "tells you to remember something and memory_read to recall it. calendar_lookup and "
     "reminders_lookup take NO arguments and return upcoming items across ALL "
     "calendars/lists; use calendar_lookup for any calendar, schedule, events, or "
@@ -158,14 +165,14 @@ PROTOCOL = (
 )
 
 # Tools that take no arguments and are normalized to a simple ok=true observation.
+# (memory_status / memory_list are NOT here: they route through the HYBRID
+# MemoryEmulator's local-first read below.)
 NO_ARG_MOCKABLE = {
     "calendar_lookup",
     "reminders_lookup",
     "weather_summary",
     "current_location_summary",
     "device_status",
-    "memory_status",
-    "memory_list",
     "tasks_list",
 }
 
@@ -228,14 +235,218 @@ def extract_and_validate(route_text: str):
         return "invalid", candidate
 
 
-def mock_tool_observation(tool: str, route: dict, fixtures: dict):
-    """Build the tool=/ok=/... envelope + a human localFinalText, mocked."""
+# Proxy-ONLY tools (tasks / gmail). These live only behind the Apps Script proxy;
+# when the proxy is not configured they fail open with an ok=false envelope
+# instead of halting. Memory tools are NOT here: memory is the HYBRID backend
+# (local Files + proxy Sheet) modeled by MemoryEmulator below.
+PROXY_ONLY_TOOLS = {
+    "tasks_list", "tasks_add", "tasks_complete",
+    "gmail_search", "gmail_read", "draft_email", "send_email",
+}
+
+# --- HYBRID memory model (mirror of iris.cherri Decision 1) ---
+# The shortcut reads a one-time @memoryBackend selector, normalized like every
+# other config value (whitespace-stripped, lowercased); an unrecognized value
+# falls back to "hybrid". The vocabulary is hybrid | local | sheets (NOT the old
+# auto/proxy names).
+MEMORY_BACKENDS = ("hybrid", "local", "sheets")
+DEFAULT_MEMORY_BACKEND = "hybrid"
+
+# Memory tools split by direction. Writes go write-through to every selected
+# backend; reads are local-first with proxy fallback. create_note/quick_journal
+# reuse the same write-through path (topics notes/journal).
+MEMORY_WRITE_TOOLS = {"memory_append", "create_note", "quick_journal"}
+MEMORY_READ_TOOLS = {"memory_read", "memory_list", "memory_status"}
+MEMORY_TOOLS = MEMORY_WRITE_TOOLS | MEMORY_READ_TOOLS | {"memory_summary"}
+
+# topic -> OKF concept `type`, mirroring iris.cherri's @okfType ladder and the
+# proxy's _okfType(topic). An unknown topic falls back to "Memory Entry" (the
+# shortcut also falls unknown topics back to the log file/topic).
+OKF_TYPE_BY_TOPIC = {
+    "index": "Index",
+    "profile": "Profile",
+    "preferences": "User Preference",
+    "log": "Memory Entry",
+    "notes": "Note",
+    "journal": "Journal",
+}
+MEMORY_TOPICS = tuple(OKF_TYPE_BY_TOPIC.keys())
+# Fixed OKF timestamp for deterministic simulation (the device/proxy stamps a
+# real ISO-8601 time; the value is opaque to every assertion here).
+OKF_TIMESTAMP = "2026-01-01T00:00:00Z"
+
+
+def normalize_backend(raw: str) -> str:
+    """Mirror iris.cherri: strip whitespace, lowercase, unrecognized -> hybrid."""
+    lowered = re.sub(r"\s+", "", raw or "").lower()
+    return lowered if lowered in MEMORY_BACKENDS else DEFAULT_MEMORY_BACKEND
+
+
+def mem_local_on(backend: str) -> bool:
+    """@memLocalOn: local Files leg is on for `local` or `hybrid`."""
+    return backend in ("local", "hybrid")
+
+
+def mem_proxy_on(backend: str, proxy_ok: bool) -> bool:
+    """@memProxyOn: proxy Sheet leg is on for `sheets`/`hybrid` AND a real proxy."""
+    return backend in ("sheets", "hybrid") and bool(proxy_ok)
+
+
+def okf_type(topic: str) -> str:
+    return OKF_TYPE_BY_TOPIC.get(topic, "Memory Entry")
+
+
+def build_okf_block(topic: str, body: str, timestamp: str = OKF_TIMESTAMP) -> str:
+    """Build the OKF concept block the shortcut/proxy stores (same shape in BOTH
+    stores): YAML frontmatter (type/title/tags/timestamp) then the body. Mirrors
+    iris.cherri's @okfBlock and the proxy's _rowToOkf row reconstruction."""
+    return (f"\n---\ntype: {okf_type(topic)}\ntitle: \ntags: \n"
+            f"timestamp: {timestamp}\n---\n{body}\n")
+
+
+def okf_body(block: str) -> str:
+    """Reconstruct the body text from an OKF concept block (the text after the
+    closing frontmatter fence). Round-trips build_okf_block()."""
+    segments = block.split("\n---\n")
+    if len(segments) >= 3:
+        return segments[2].strip()
+    return block.strip()
+
+
+class MemoryEmulator:
+    """Faithful emulation of the HYBRID memory backend from iris.cherri.
+
+    Two independent stores are modeled: an emulated phone-local Files store and an
+    emulated proxy Google Sheet. The @memoryBackend selector (crossed with whether
+    a real proxy is configured) decides which legs are live:
+
+      - hybrid : local leg AND proxy leg (when the proxy is configured)
+      - local  : local leg only
+      - sheets : proxy leg only (when the proxy is configured)
+
+    Writes are WRITE-THROUGH: the SAME OKF concept block is appended to every live
+    leg, and the write succeeds if EITHER leg was written. Reads are LOCAL-FIRST
+    with PROXY FALLBACK: the local file is read first, and only when it is
+    empty/missing does the read fall back to the proxy. Both stores hold the same
+    OKF-formatted entry, so a stored entry always reconstructs to the input body.
+    """
+
+    def __init__(self, backend: str = DEFAULT_MEMORY_BACKEND, proxy_ok: bool = True,
+                 timestamp: str = OKF_TIMESTAMP):
+        self.backend = normalize_backend(backend)
+        self.local_on = mem_local_on(self.backend)
+        self.proxy_on = mem_proxy_on(self.backend, proxy_ok)
+        # topic -> list of appended OKF concept blocks (opaque text in each store).
+        self.local: dict[str, list[str]] = {}
+        self.proxy: dict[str, list[str]] = {}
+        self.timestamp = timestamp
+
+    def available(self) -> bool:
+        return self.local_on or self.proxy_on
+
+    def append(self, topic: str, body: str) -> bool:
+        """Write-through the OKF block to every live leg. True if either wrote."""
+        block = build_okf_block(topic, body, self.timestamp)
+        wrote = False
+        # Local FIRST (instant, iCloud-quota-proof), then the proxy mirror.
+        if self.local_on:
+            self.local.setdefault(topic, []).append(block)
+            wrote = True
+        if self.proxy_on:
+            self.proxy.setdefault(topic, []).append(block)
+            wrote = True
+        return wrote
+
+    def read(self, topic: str) -> str:
+        """Local-first, proxy fallback. Returns the records text (may be empty).
+
+        The local read returns the opaque concatenated file text (the OKF blocks
+        as written); the proxy read returns the bodies joined newest-last, exactly
+        as the two legs behave in iris.cherri. In both cases the written body is a
+        substring of the returned records."""
+        if self.local_on:
+            blocks = self.local.get(topic, [])
+            if blocks:
+                return "".join(blocks)
+        if self.proxy_on:
+            blocks = self.proxy.get(topic, [])
+            if blocks:
+                return "; ".join(okf_body(b) for b in blocks)
+        return ""
+
+
+def mock_tool_observation(tool: str, route: dict, fixtures: dict,
+                          mem: "MemoryEmulator | None" = None, proxy_ok: bool = True):
+    """Build the tool=/ok=/... envelope + a human localFinalText, mocked.
+
+    `mem` is a per-run MemoryEmulator modeling the HYBRID backend (local Files +
+    proxy Sheet) so a memory_append(topic, body) is recalled by a later
+    memory_read(topic) via write-through + local-first read. When neither backend
+    is available (e.g. selector `sheets` with the proxy unconfigured), memory
+    tools fail open with an ok=false "pick a backend" envelope and the loop
+    continues to a normal spoken answer (Req 3.6). Proxy-ONLY tools (tasks/gmail)
+    fail open when `proxy_ok` is False, exactly as the shortcut does.
+    """
+    mem = mem if mem is not None else MemoryEmulator(DEFAULT_MEMORY_BACKEND, proxy_ok)
+
+    # --- Memory tools: HYBRID write-through / local-first read ---
+    if tool in MEMORY_TOOLS:
+        if not mem.available():
+            # Neither backend available -> fail open (Req 3.6).
+            env = (f"tool={tool}\nok=false\ncount=0\nresult=\nrecords=\n"
+                   "error=Memory is not set up. Pick a backend: set the memory "
+                   "backend box to local, or deploy the Apps Script proxy.")
+            return env, "Memory is not set up yet, so I could not do that."
+
+        if tool in MEMORY_WRITE_TOOLS:
+            topic = (route.get("topic") or
+                     ("notes" if tool == "create_note" else
+                      "journal" if tool == "quick_journal" else "log"))
+            # An unknown topic falls back to log (matches the shortcut/proxy).
+            if topic not in MEMORY_TOPICS:
+                topic = "log"
+            body = route.get("body") or ""
+            mem.append(topic, body)
+            env = (f"tool={tool}\nok=true\ncount=1\nresult=Saved to {topic} memory.\n"
+                   f"records={body}\nerror=")
+            return env, "Saved that to your memory."
+
+        # memory_read / memory_list / memory_status: local-first, proxy fallback.
+        topic = route.get("topic") or "log"
+        if topic not in MEMORY_TOPICS:
+            topic = "log"
+        read_topic = "log" if tool in ("memory_list", "memory_status") else topic
+        records = mem.read(read_topic)
+        if tool == "memory_status":
+            has_any = bool(records)
+            env = (f"tool=memory_status\nok={str(has_any).lower()}\n"
+                   f"count={1 if has_any else 0}\n"
+                   f"result={'Memory has entries.' if has_any else ''}\n"
+                   f"records=\nerror={'' if has_any else 'Memory is empty or not set up.'}")
+            return env, ("You have memory saved." if has_any
+                         else "Your memory is empty.")
+        if records:
+            env = (f"tool={tool}\nok=true\ncount=1\nresult=Read {read_topic} memory.\n"
+                   f"records={records}\nerror=")
+            return env, records
+        env = (f"tool={tool}\nok=false\ncount=0\nresult=\nrecords=\n"
+               "error=No memory found for that topic yet.")
+        return env, "I do not have anything saved about that yet."
+
+    # --- Proxy-only tools fail open when the proxy is unconfigured (Req 3.6) ---
+    if not proxy_ok and tool in PROXY_ONLY_TOOLS:
+        env = (f"tool={tool}\nok=false\ncount=0\nresult=\nrecords=\n"
+               "error=Google is not set up. Deploy the Apps Script proxy and "
+               "paste its URL and secret in.")
+        return env, "That is not set up yet, so I could not do that."
+
     if tool in fixtures:
         fx = fixtures[tool]
         env = (f"tool={tool}\nok={str(fx.get('ok', True)).lower()}\n"
                f"count={fx.get('count', 1)}\nresult={fx.get('result', '')}\n"
                f"records={fx.get('records', '')}\nerror={fx.get('error', '')}")
         return env, fx.get("local", f"Done: {tool}.")
+
     if tool in NO_ARG_MOCKABLE:
         env = (f"tool={tool}\nok=true\ncount=1\nresult={tool} returned mock data\n"
                f"records=mock\nerror=")
@@ -247,13 +458,25 @@ def mock_tool_observation(tool: str, route: dict, fixtures: dict):
 
 class Scenario:
     def __init__(self, name, request, replies=None, fixtures=None,
-                 mock_model=None, asserts=None):
+                 mock_model=None, asserts=None, seed_context="", proxy_ok=True,
+                 memory_backend=DEFAULT_MEMORY_BACKEND):
         self.name = name
         self.request = request
         self.replies = list(replies or [])          # answers to ask_user / follow-ups
         self.fixtures = fixtures or {}
         self.mock_model = list(mock_model or [])     # scripted model replies (--mock)
         self.asserts = asserts or {}                 # e.g. {"first_type": "tool_call"}
+        # Pre-seed the running context (used to drive the token-based compaction
+        # trigger deterministically without a huge scripted conversation).
+        self.seed_context = seed_context or ""
+        # When False, proxy-only tools (tasks / gmail) and the proxy leg of memory
+        # return an ok=false "not set up" envelope, mirroring iris.cherri's
+        # @proxyOk guard (Req 3.6).
+        self.proxy_ok = proxy_ok
+        # The one-time @memoryBackend selector (hybrid | local | sheets). Passed
+        # verbatim (whitespace/case preserved) so the emulator normalizes it
+        # exactly like the shortcut; an unrecognized value falls back to hybrid.
+        self.memory_backend = memory_backend
 
     def next_reply(self):
         return self.replies.pop(0) if self.replies else ""
@@ -264,7 +487,7 @@ class Scenario:
 
 def run(scenario: Scenario, model: str, use_mock: bool, verbose: bool):
     """Execute one scenario through the faithful loop. Returns a result dict."""
-    loop_context = ""
+    loop_context = scenario.seed_context
     tool_calls = 0
     user_questions = 0
     repair_count = 0
@@ -274,7 +497,14 @@ def run(scenario: Scenario, model: str, use_mock: bool, verbose: bool):
     final_text = ""
     trace = []            # list of (turn, kind, detail)
     first_type = None
-    exchanges_since_compact = 0
+    # Emulated HYBRID memory backend (local Files + proxy Sheet), routed by the
+    # scenario's @memoryBackend selector crossed with proxy availability.
+    mem = MemoryEmulator(scenario.memory_backend, scenario.proxy_ok)
+    # The message the planner is currently answering. Initialized to the first
+    # request; on a non-stop follow-up it is repointed to the latest message so
+    # the planner answers the most recent request while the full prior
+    # conversation stays in loop_context (mirrors iris.cherri @currentRequest).
+    current_request = scenario.request
     mock_fn = scenario.next_model if use_mock else None
 
     print(f"\n{'='*70}\nSCENARIO: {scenario.name}\n  request: {scenario.request!r}\n{'='*70}")
@@ -283,8 +513,13 @@ def run(scenario: Scenario, model: str, use_mock: bool, verbose: bool):
         remaining_tools = MAX_TOOL_CALLS - tool_calls
         remaining_q = MAX_USER_QUESTIONS - user_questions
 
-        # --- Context compaction (mirror of the shortcut) ---
-        if exchanges_since_compact >= MAX_CONTEXT_EXCHANGES:
+        # --- Context compaction (token-based, mirror of the shortcut) ---
+        # Estimate the outgoing planner call's token usage (chars / 4 over the
+        # protocol, the running context, and the current request) and compact
+        # when it reaches ~80% of the latency-safe working budget.
+        approx_chars = len(PROTOCOL) + len(loop_context) + len(current_request)
+        approx_tokens = approx_chars // 4
+        if approx_tokens >= COMPACT_AT_TOKENS:
             if use_mock:
                 summary = "(mock summary of prior conversation)"
             else:
@@ -294,11 +529,10 @@ def run(scenario: Scenario, model: str, use_mock: bool, verbose: bool):
                     "summary now.", model=model, max_tokens=220, temperature=0.3)
             if summary:
                 loop_context = f"\n\nconversation_summary={summary}"
-            exchanges_since_compact = 0
             trace.append((turn, "compact", ""))
             print(f"   [context compacted -> {loop_context[:80]!r}]")
 
-        user_msg = (f"CONVERSATION\nuser_request={scenario.request}{loop_context}\n"
+        user_msg = (f"CONVERSATION\nuser_request={current_request}{loop_context}\n"
                     f"remaining_tool_calls={remaining_tools}\n"
                     f"remaining_user_questions={remaining_q}\n"
                     "Reply with one flat single-line JSON object now.")
@@ -388,7 +622,8 @@ def run(scenario: Scenario, model: str, use_mock: bool, verbose: bool):
             elif intent == "tool_call":
                 if tool_calls < MAX_TOOL_CALLS:
                     tool_calls += 1
-                    env, local = mock_tool_observation(tool, route, scenario.fixtures)
+                    env, local = mock_tool_observation(
+                        tool, route, scenario.fixtures, mem, scenario.proxy_ok)
                     last_local_final = local
                     has_local_final = True
                     print(f"   tool_call -> {tool}\n      obs: {env.splitlines()[1]}")
@@ -429,12 +664,15 @@ def run(scenario: Scenario, model: str, use_mock: bool, verbose: bool):
             if follow and not STOP_WORD_RE.match(follow):
                 # A non-stop follow-up is a NEW request: reset per-request
                 # budgets, mirroring the shortcut, so a conversation does not
-                # exhaust them.
+                # exhaust them. Fold the prior exchange into the running context
+                # and repoint the current request to the latest message so the
+                # planner answers the follow-up (mirrors iris.cherri @currentRequest).
                 tool_calls = 0
                 user_questions = 0
                 repair_count = 0
-                exchanges_since_compact += 1
-                loop_context += f"\n\nassistant_answer={final_text}\nuser_followup={follow}"
+                loop_context += (f"\n\nprevious_exchange=\nuser_said={current_request}"
+                                 f"\nassistant_answered={final_text}")
+                current_request = follow
                 trace.append((turn, "followup", follow[:40]))
                 continue
             outcome = "finish"
@@ -473,6 +711,11 @@ def run(scenario: Scenario, model: str, use_mock: bool, verbose: bool):
         failures.append(
             "expected context compaction to trigger in a long conversation, "
             "but it did not")
+    if "final_current_request" in a and current_request != a["final_current_request"]:
+        failures.append(
+            "planner current request should be the most recent user message "
+            f"{a['final_current_request']!r}, but was {current_request!r} "
+            "(follow-up was not answered as the current request)")
 
     print(f"\n  RESULT first_type={first_type} tools={tool_calls} q={user_questions} "
           f"repairs={repair_count} outcome={outcome}")
@@ -483,7 +726,7 @@ def run(scenario: Scenario, model: str, use_mock: bool, verbose: bool):
     elif a:
         print("  ASSERT PASS")
     return {"first_type": first_type, "tools": tool_calls, "questions": user_questions,
-            "failures": failures}
+            "failures": failures, "memory": mem, "memory_backend": mem.backend}
 
 
 def scenarios():
@@ -509,12 +752,47 @@ def scenarios():
                                                 "cannot tell",
                                                 "can't tell a joke"]}),
         # A multi-turn conversation (several jokes in a row) must finish
-        # cleanly, never hitting "I ran out of conversation turns".
+        # cleanly, never hitting "I ran out of conversation turns". Short jokes
+        # stay well under the token budget, so compaction does NOT fire here -
+        # that is correct under the token-based trigger (it is exercised by the
+        # dedicated token_compaction scenario below).
         Scenario("many_jokes", "tell me a joke",
                  replies=["another one", "another", "one more", "another",
                           "another", "no thanks"],
-                 asserts={"no_ask_user": True, "no_turn_exhaustion": True,
-                          "expect_compaction": True}),
+                 asserts={"no_ask_user": True, "no_turn_exhaustion": True}),
+        # Token-based compaction: a large running context (seeded past the
+        # ~9600-token trigger) is compacted into one summary on the next turn.
+        Scenario("token_compaction", "keep going",
+                 replies=["no thanks"],
+                 seed_context=("\n\nprevious_exchange=\nuser_said=tell me a story"
+                               "\nassistant_answered=" +
+                               ("Once upon a time in a faraway place. " * 1200)),
+                 asserts={"expect_compaction": True, "first_type": "final_answer"}),
+        # Follow-up context (Bug 2): "when is the next match" -> web_search ->
+        # "tell me more about that match". After the follow-up the planner's
+        # current request must be the most recent user message, not the original.
+        Scenario("followup_next_match", "when is the next match",
+                 replies=["tell me more about that match", "no thanks"],
+                 fixtures={"web_search": {
+                     "ok": True, "count": 1,
+                     "result": "The next match is on June 11 2026 at Estadio Azteca.",
+                     "records": "- FIFA.com: 2026 World Cup opens June 11 2026.",
+                     "local": "The next match is June 11, 2026."}},
+                 asserts={"first_type": "tool_call:web_search", "no_ask_user": True,
+                          "final_current_request": "tell me more about that match"}),
+        # Fail-open (Req 3.6): with NEITHER backend available (selector `sheets`
+        # forces local off, and the proxy is unconfigured) a memory request
+        # returns an ok=false "pick a backend" envelope and the loop still answers
+        # normally, never halting or exhausting the turn budget.
+        Scenario("failopen_memory_unconfigured", "remember that I like tea",
+                 replies=["no thanks"], proxy_ok=False, memory_backend="sheets",
+                 asserts={"first_type": "tool_call:memory_append",
+                          "no_ask_user": True, "no_turn_exhaustion": True}),
+        # Hybrid write-through: the default backend writes memory to BOTH stores.
+        Scenario("hybrid_remember", "remember that I prefer tea over coffee",
+                 replies=["no thanks"], memory_backend="hybrid",
+                 asserts={"first_type": "tool_call:memory_append",
+                          "no_ask_user": True, "no_turn_exhaustion": True}),
         # Google Tasks routing: read and add.
         Scenario("list_tasks", "what are my google tasks", replies=["no thanks"],
                  fixtures={"tasks_list": {

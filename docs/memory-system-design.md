@@ -1,8 +1,8 @@
 ---
 type: Design
-title: Iris Phone-Local Memory System Design
-summary: A working, hands-free memory layer for Iris built on device-validated Files actions, mapped to Cherri custom actions and the bounded tool loop.
-status: design-ready-pending-device-validation
+title: Iris Memory System Design
+summary: A working, hands-free memory layer for Iris. Now HYBRID — a one-time @memoryBackend selector (hybrid default | local | sheets) that write-throughs OKF entries to a phone-local Files store AND a proxy-backed Google Sheet, reads local-first with proxy fallback, and stores the same OKF concept in both. This supersedes the earlier proxy-only design; on-device testing confirmed built-in Files writes DO persist. Earlier Files-only sections are retained for history and marked superseded.
+status: implemented-hybrid-backed
 tags:
   - iris
   - memory
@@ -23,43 +23,239 @@ sources:
   - tmp/iris-memory-ref/shortcut.json
 ---
 
-# Iris Phone-Local Memory System Design
+# Iris Memory System Design
 
-> **UPDATE 2026-07-06 — IMPLEMENTED, root cause fixed.** The earlier approach in
-> this doc (hand-rolled `action '...'` custom definitions with community-guessed
-> WFKeys) was the bug: keys like `WFShowFilePicker`, `WFFileAppendNewLine`, and
-> `WFDestinationPath` were wrong/ineffective, so the path never got set and
-> **nothing was ever stored** on device. The path also had a bad leading slash
-> (`/Shortcuts/IrisOKF`).
+> **STATUS 2026-07-06 — IMPLEMENTED, memory is now HYBRID.** Iris memory is
+> stored in a **hybrid, user-selectable backend**: a one-time `@memoryBackend`
+> selector (`hybrid` default | `local` | `sheets`) that write-throughs the same
+> **OKF-formatted concept entry** to a **phone-local Files store** *and* a
+> **server-side Google Sheet** (reached through the existing Apps Script proxy),
+> and reads **local-first with proxy fallback**. This **supersedes the earlier
+> proxy-only design**. Every Files-*only* section below (Sections 1–8) is
+> retained for history and is **superseded** by this hybrid layer.
 >
-> **Fix:** `iris.cherri` now uses **Cherri's built-in file actions** via
-> `#include 'actions/documents'` — `createFolder(path)`, `appendToFile(path, &text)`,
-> `getFile(path)` — which emit the correct, maintainer-validated WFKeys
-> (`WFFilePath`, `WFGetFilePath`, `WFAppendFileWriteMode`). The base path is
-> `Shortcuts/IrisOKF` (NO leading slash; resolves under the iCloud Drive
-> Shortcuts sandbox). The setup primer runs `createFolder` then seeds the
-> readable topic files (log/index/profile/preferences) so `getFile` never halts
-> on a missing file. `appendToFile`'s text argument MUST be a variable, not a
-> string literal. Verified in the compiled plist: correct keys present, bad keys
-> absent. Sections below are retained for history.
+> **Root-cause correction (on-device testing).** The earlier status block on
+> this doc claimed Cherri's built-in `appendToFile`/`getFile`/`createFolder`
+> "silently no-op" because they emit only a bare `WFFilePath` string and cannot
+> emit the device-specific `fileLocation` object (`WFFileLocationType`,
+> `fileProviderDomainID`, `crossDeviceItemID`, `relativeSubpath`) that a decoded
+> *working* phone-built Files action carries. **That conclusion was wrong and
+> was refuted by on-device testing.** With a fixed text path the built-in Files
+> writes **DO** land — the data was confirmed in **iCloud Drive under the
+> `Shortcuts/` folder**. The writes were never lost. The two *real* prior
+> failures were: **(a)** the parent folder was not created before the first
+> `appendToFile`, so a first write into a missing folder produced nothing; and
+> **(b)** the user was checking the wrong Files location (looking under On My
+> iPhone / a different folder than where the data actually landed). Neither is
+> "an impossible location object". The `fileLocation`/`crossDeviceItemID` object
+> is **not required** for a fixed-text-path write to succeed. Phone-local Files
+> is a viable backend after all.
+>
+> **On-device write-location probe.** Because the built-ins emit only a text
+> `WFFilePath` (no `fileLocation` object), *which* Files service they target —
+> iCloud Drive vs On My iPhone (Local Storage) — is not selectable from Cherri
+> and is not fully verified. The setup primer therefore runs a one-time
+> **write-location probe**: it writes a marker to `{@memBase}/probe.md`, reads it
+> back, and asks the user to confirm whether it landed in iCloud Drive or On My
+> iPhone under `Shortcuts/IrisOKF`, so `@memBase` can be reconciled to the real
+> location before shipping.
+>
+> **The one remaining local risk (covered by the proxy mirror).** When writes
+> land in iCloud Drive, a local write can **silently fail to sync** if iCloud
+> Drive is full/unpaid — the write appears to succeed but never propagates,
+> breaking cross-device recall and backup with no error surfaced. Shortcuts has
+> no try/catch and file actions return no error value, so this cannot be detected
+> at runtime. The hybrid keeps a **proxy Sheet mirror** regardless of the probe
+> outcome (the Sheet is immune to iCloud quota), and reads fall back to it, so
+> the case is safe *without* runtime error-detection.
+>
+> **What the hybrid layer does today (see §0):**
+> - Selector `@memoryBackend` (`hybrid`/`local`/`sheets`, default `hybrid`,
+>   unrecognized → `hybrid`) is a one-time editable Text config action, NOT a
+>   per-run spoken prompt. It derives two flags: `@memLocalOn` (`local`|`hybrid`)
+>   and `@memProxyOn` (`sheets`|`hybrid` AND a configured proxy).
+> - **Write = write-through**: under `hybrid` append the OKF entry to the local
+>   Files store **first**, then mirror it to the proxy Sheet; the write succeeds
+>   if **either** leg succeeds. `local`/`sheets` write only that one store.
+> - **Read / bootstrap = local-first, proxy fallback**: read the local file;
+>   only when it is empty/missing (and the proxy is on) fall back to the Sheet.
+> - Both stores hold the **same OKF concept**: local per-topic OKF blocks in
+>   `Shortcuts/IrisOKF/<topic>.md`, and the proxy sheet's OKF columns
+>   `timestamp | topic | type | title | tags | body`.
+> - Topics: `index`, `profile`, `preferences`, `log`, `notes`, `journal`
+>   (default `log`); any other topic falls back to `log`.
+> - Writes are **append-only**, no overwrite.
+> - Both stores **self-heal**: the proxy finds-or-creates the `Iris Memory`
+>   sheet + `memory` tab, and the client seeds the local `Shortcuts/IrisOKF`
+>   folder (setup primer + auto-creating `appendToFile`), so the first write
+>   succeeds with no prior manual setup.
+> - A `memory_summary` bootstrap injects a compact (≤600 char) profile +
+>   preferences + recent-index summary once at session start (local-first).
+> - Everything is **fail-open**: when no selected backend is available, Iris runs
+>   and answers normally with no memory and never halts.
+>
+> The client tools (`memory_read`, `memory_append`, `memory_list`,
+> `memory_status`) and `create_note`/`quick_journal` writes call the local Files
+> actions and/or the proxy over GET (mirroring the `tasks_*` blocks), honoring
+> the selector. See `docs/apps-script-proxy.md` §4 for the server ops,
+> `docs/okf-knowledge-base.md` for the OKF concept shape,
+> `docs/architecture.md` and `agentic-loop.md` for the loop view, and
+> `.kiro/specs/memory-persistence-and-context/design.md` (the source of truth)
+> for the full rationale.
 
-This is a design document only. It does not modify `shortcuts/iris.cherri` and
-nothing here is compiled. It specifies a **working, hands-free** phone-local
-memory layer for Iris, replacing the aspirational (and never-implemented) OKF
-tool set in `docs/okf-knowledge-base.md` with concrete, device-verified action
-shapes and Cherri custom-action definitions that follow the existing pattern in
-`iris.cherri`.
+This is a design document. Sections 1–8 below describe the earlier
+**phone-local Files-only** design and are kept only for history; they are
+**SUPERSEDED** by the hybrid layer summarized above and are no longer the
+implemented behavior. In particular, the Section 3 "silent no-op / impossible
+`fileLocation`" diagnosis is **retracted** — see the root-cause correction in
+the status block above.
 
-The single most important requirement: memory must work **under Siri, hands
-free, with no picker popups**. The reference shortcut the user captured
-(`tmp/iris-memory-ref/shortcut.json`) uses the *interactive* picker variants,
-which prompt the user. Section 2 documents the *non-interactive* parameter
-variants that make read/write silent.
+Content licensing note: action parameter details in the historical sections were
+confirmed against Matthew Cassinelli's Shortcuts action directory and rephrased
+for compliance; exact `WFKey` strings that were never visible in a reference
+plist are marked **must validate on device**.
 
-Content licensing note: action parameter details below were confirmed against
-Matthew Cassinelli's Shortcuts action directory and rephrased for compliance;
-exact `WFKey` strings that are not visible in the reference plist are marked
-**must validate on device**.
+---
+
+## 0. Hybrid memory (implemented) — the current design
+
+Memory is a fixed set of predeclared tools, not arbitrary file access. The same
+**OKF-formatted concept entry** is written to a phone-local Files store and/or a
+proxy-backed Google Sheet, selected by a one-time `@memoryBackend` config.
+Reads are local-first with a proxy fallback. The proxy leg is a GET that returns
+the standard Iris envelope (`tool=/ok=/count=/result=/records=/error=`); the
+Shortcut parses only that outer JSON envelope with `getDictionary()`/`getValue()`
+and forwards `records` to the planner as opaque text. The local leg reads the
+per-topic Markdown file back as **opaque text** (YAML frontmatter + body, never
+JSON), so it is **never** passed to `getDictionary()` (Req 3.2, 3.7).
+
+### 0.1 Backend selector (one-time config, not a per-run prompt)
+
+An editable Text action next to the API-key config holds `@memoryBackendRaw`
+(default `"hybrid"`). It is normalized (whitespace-stripped, lowercased) to
+`@memoryBackend`, and an unrecognized value falls back to `hybrid` via flat
+guarded `if`s (never `else if`, per the compiler rule):
+
+- `hybrid` (default): write phone-local Files **first**, then mirror to the
+  proxy Sheet; read local-first with proxy fallback.
+- `local`: phone-local Files only (fast/offline; can lose cross-device sync if
+  iCloud Drive is full).
+- `sheets`: Google Sheet via the Apps Script proxy only (durable, cross-device,
+  immune to iCloud quota).
+
+A per-run **voice** prompt is deliberately NOT used: under hands-free/locked Siri
+the only reliable conversational primitive is Ask for Input, asking the backend
+every run would be a picker-like gate on the happy path (violates Req 3.1), add
+latency, and cannot persist a choice. A Text action is the persistence surface
+that already works reliably in this shortcut (it is how the API key survives).
+
+Two derived flags decide what each dispatch does (nested flat `if`s):
+
+- `@memProxyOn = "yes"` when (`@memoryBackend == "sheets"` OR `"hybrid"`) AND
+  `@proxyOk > 0`. (The selector value is `sheets`; the transport is still the
+  Apps Script proxy, so the flag name stays `@memProxyOn`.)
+- `@memLocalOn = "yes"` when `@memoryBackend == "local"` OR `"hybrid"`. Local
+  Files are confirmed working, so there is no runtime availability probe; a
+  silent iCloud sync loss is covered by the Sheet mirror under `hybrid`.
+
+### 0.2 OKF concept entry (stored in BOTH stores)
+
+Each `memory_append(topic, body)` is wrapped by the **storage layer** (not the
+model) into an OKF concept entry (`docs/okf-knowledge-base.md`): YAML frontmatter
+(`type` derived from topic, optional `title`/`tags`, ISO-8601 `timestamp`
+stamped by the shortcut/proxy) followed by the `body`. The **model-facing
+protocol stays `memory_append(topic, body)` only** — no `title`/`tags`/`type` are
+added to the protocol, keeping the planner prompt compact for the ~25s budget.
+
+**Local storage shape (Files).** The OKF block is **appended** to
+`{@memBase}/<topic>.md` (`@memBase = "Shortcuts/IrisOKF"`), append-only. The
+client derives `@okfType` from topic (default `Memory Entry`;
+preferences→`User Preference`, profile→`Profile`, notes→`Note`,
+journal→`Journal`, index→`Index`) and stamps `timestamp` from `@nowRaw`; the
+model supplies only `body`.
+
+**Server storage shape (proxy Sheet).** One append-only sheet `Iris Memory`,
+found-or-created by name, tab `memory`, header row
+`timestamp | topic | type | title | tags | body`. A write appends one row
+`[ISO-8601 now, topic, type, title, tags, body]`; one row reconstructs to one
+OKF concept (`memory_read(topic, format=okf)` returns the reconstructed block,
+default returns just the `body` values joined newest-last for voice, capped at
+`MAX_MEMORY_ROWS` = 20). `topic` is constrained server-side to the allowlist
+`index`, `profile`, `preferences`, `log`, `notes`, `journal`; anything else
+falls back to `log`, so the planner can never address arbitrary storage.
+
+### 0.3 Self-heal on first write (both stores)
+
+The proxy `_memorySheet()` finds the `Iris Memory` spreadsheet by name or creates
+it, and finds the `memory` tab or inserts it with the six-column header. On the
+client, the setup primer runs `createAgentFolder("{@memBase}")` and seeds each
+topic file, and every `memory_append` calls `createAgentFolder` before the
+append. So the very first write succeeds with no prior manual setup — no missing
+parent folder, and (on the proxy side) no device path to validate.
+
+### 0.4 On-device write-location probe (setup only)
+
+Because the built-in Files actions emit only a text `WFFilePath` and no
+`fileLocation` object, which service they target (iCloud Drive vs On My iPhone /
+Local Storage) is not selectable from Cherri and is unverified. The setup primer
+writes a marker to `{@memBase}/probe.md`, reads it back, and asks the user to
+confirm where it landed, so `@memBase` can be reconciled to the real location
+before shipping. Writes are confirmed to land in **iCloud Drive/Shortcuts**; the
+probe settles whether they can instead be pinned to On My iPhone for full
+iCloud-quota immunity. The durable Sheet leg does not depend on the outcome.
+
+### 0.5 Agent-facing tools (implemented)
+
+| Tool | Args | Behavior |
+| --- | --- | --- |
+| `memory_read` | `topic` | Local-first (read `{@memBase}/<topic>.md` as opaque text); proxy fallback only when the local read is empty/missing and `@memProxyOn`. `ok=false` when none saved. Spoken (`@speakRecords`). |
+| `memory_append` | `topic`, `body` | Write-through: local OKF append **first** when `@memLocalOn`, then proxy mirror when `@memProxyOn`; `ok=true` if either leg wrote. Requires a non-empty `body`. Append-only. |
+| `memory_list` | — | Local-first, proxy fallback: recent `topic: body` rows across topics. Spoken. |
+| `memory_status` | — | Local-first, proxy fallback: reports whether memory has content. |
+
+`create_note` (`topic=notes`) and `quick_journal` (`topic=journal`) reuse the
+same write-through path (local OKF append AND proxy mirror, honoring the
+selector). Each leg fails open independently; when **neither** backend is
+available, the block sets an `ok=false` "Memory is not set up" envelope and a
+fail-open `@localFinalText`, so the run continues (Req 3.6). Neither the local
+file text nor the proxy `records` string is ever passed to `getDictionary()` —
+only the outer proxy envelope is (Req 3.2, 3.7).
+
+### 0.6 Startup bootstrap (`memory_summary`) — local-first
+
+Before the loop (after the setup primer, before the first planner call), Iris
+builds a compact durable-context summary. **Local-first:** when `@memLocalOn` it
+reads the local `profile.md` + `preferences.md` (opaque text) and joins them.
+**Proxy fallback:** only when the local read produced nothing AND `@memProxyOn`,
+it GETs the proxy `memory_summary` op (a compact profile + preferences +
+recent-index summary the server hard-caps at 600 chars so it never fattens every
+planner call toward the ~25s budget). When non-empty, the summary is injected
+once into `@loopContext` as `memory_summary=<text>` — as observation data, not
+instructions. Fail-open: when neither backend answers, `@loopContext` is left
+unchanged and Iris behaves exactly as it does with no memory. The proxy fallback
+covers the iCloud-full silent-sync-loss case (a local copy that never synced is
+recovered from the Sheet mirror).
+
+### 0.7 Why phone-local Files is a viable backend (correction)
+
+Contrary to the retracted Section 3 diagnosis, on-device testing confirmed that a
+fixed-text-path built-in write **does** persist (it landed in iCloud Drive under
+`Shortcuts/`). The `fileLocation`/`crossDeviceItemID` object is not required for
+a write to succeed. The prior failures were a missing parent folder before the
+first append and the user checking the wrong Files location — both fixed by the
+`createFolder` seed/self-heal (0.3) and the write-location probe (0.4). The
+hybrid keeps the proxy Sheet mirror only to remove the residual iCloud-full
+silent-sync risk, not because local Files "no-op".
+
+---
+
+> **The remainder of this document (Sections 1–8) is SUPERSEDED.** It describes
+> the earlier Files-only design (interactive-picker variants, WFKey validation,
+> and the now-**retracted** "silent no-op / impossible `fileLocation`"
+> root-cause diagnosis) and is retained only for historical context. The
+> implemented behavior is the hybrid layer in Section 0 above; note that the
+> local Files leg of the hybrid reuses the fixed-text-path built-ins from
+> Section 2, which are confirmed working on device.
 
 ---
 

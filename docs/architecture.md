@@ -75,13 +75,27 @@ only to stop a pathological runaway; a normal conversation never reaches it.
 
 Because each model call is stateless, the whole loop context is re-sent every
 turn. Over a long conversation that context grows and slows every call toward
-the ~25s iOS timeout (and degrades accuracy). To bound it, after every few
-follow-up exchanges (`@maxContextExchanges`, default 4) the Shortcut makes one
-extra model call that summarizes the running conversation into a short handoff,
-then replaces the raw log with that summary. Compaction runs only on a follow-up
+the ~25s iOS timeout (and degrades accuracy). To bound it, compaction fires on
+**estimated token usage** rather than a fixed exchange count. Each turn the
+Shortcut estimates the outgoing prompt size — `count(@protocol) +
+count(@loopContext) + count(@currentRequest)`, divided by 4 as a cheap
+chars-to-tokens heuristic — and when that reaches `@compactAtTokens` (9600,
+about 80% of a latency-safe ~12k working budget) it makes one extra model call
+that summarizes the running conversation into a short handoff, then replaces the
+raw log with that summary. The working budget is deliberately far below the
+model's true 128k window so every call still returns within the ~25s iOS budget.
+The summary prompt is instructed to preserve named entities and specifics
+(proper nouns, titles, numbers, the most recent request, any "that X"
+antecedent) so follow-up references survive. Compaction runs only on a follow-up
 boundary, never mid-request, so no in-flight tool observation is lost, and if the
 summary call fails the raw context is kept unchanged. This mirrors the
 compaction/handoff pattern used by coding agents.
+
+The planner is led by the most recent user message: the user-message template
+sends `user_request={@currentRequest}`, which is repointed to each new follow-up
+while the full prior conversation is retained in `@loopContext` as history. This
+lets a follow-up like "tell me more about that match" be answered as a follow-up
+rather than re-answering the original request.
 
 Tool routes return data to the planner using a line-based result envelope. For
 example, a calendar lookup can retrieve upcoming events, then send those events
@@ -108,21 +122,54 @@ context across turns.
 
 ## OKF Memory Layer
 
-Iris treats phone-local OKF memory under `Shortcuts/IrisOKF/` as
-a predeclared-tool surface, not arbitrary file access. Today only one memory
-tool is implemented in `shortcuts/iris.cherri`:
+Iris memory is **hybrid**: the same OKF-formatted concept entry is written to a
+**phone-local Files store** (per-topic OKF Markdown under `Shortcuts/IrisOKF/`)
+and/or a server-side append-only **Google Sheet** (`Iris Memory`, tab `memory`,
+columns `timestamp | topic | type | title | tags | body`) reached through the
+Apps Script proxy. A one-time `@memoryBackend` selector (an editable Text config
+action, values `hybrid` default | `local` | `sheets`, unrecognized → `hybrid`)
+chooses the backend; it is not a per-run spoken prompt (that would gate the
+hands-free happy path). It derives two flags, `@memLocalOn` (`local`|`hybrid`)
+and `@memProxyOn` (`sheets`|`hybrid` AND a configured proxy).
 
-- `memory_status`: checks whether the OKF folder can be read and returns its
-  folder contents as an observation.
+On-device testing confirmed the phone-local Files writes **do** persist — they
+land in iCloud Drive under `Shortcuts/`, so the earlier "generated shortcuts
+cannot emit `fileLocation` so writes no-op" conclusion was wrong and is retracted
+(see `docs/memory-system-design.md` §0). The prior failures were a missing parent
+folder before the first write and the user checking the wrong Files location,
+both fixed by a `createFolder` seed/self-heal and an on-device write-location
+probe. The proxy Sheet mirror remains because a phone-local write can silently
+fail to sync when iCloud Drive is full; the Sheet is immune to iCloud quota.
+Memory remains a predeclared-tool surface, not arbitrary file access; the model
+passes a `topic` and the storage layer resolves the local path / sheet row.
 
-The other memory tools (`memory_lookup`, `memory_list_topics`,
-`memory_propose_write`, `memory_append_log`) and the startup memory bootstrap
-are planned but not yet wired into the loop or the planner protocol.
+The memory tools implemented in `shortcuts/iris.cherri` are hybrid:
 
-Memory files are Markdown concepts with YAML frontmatter. The Shortcut treats
-memory content as user data, not instructions. Relevant snippets may be sent to
-the model for summarization, so the runtime should avoid dumping the whole
-memory folder into prompts.
+- `memory_read(topic)`: return the recent bodies saved under a topic, reading
+  local-first with proxy fallback.
+- `memory_append(topic, body)`: write-through — append the OKF entry to the
+  local file first, then mirror it to the sheet row (append-only); succeed if
+  either leg wrote.
+- `memory_list`: return the last N `topic: body` rows across all topics,
+  local-first with proxy fallback.
+- `memory_status`: report whether memory has content, local-first with proxy
+  fallback.
+
+`topic` is constrained to the allowlist `index profile preferences log notes
+journal` (default `log`), and both stores self-heal on the first write. The
+model-facing surface stays `memory_append(topic, body)` only — `type`/`title`/
+`tags` are derived by the storage layer, keeping the planner prompt compact.
+`create_note` and `quick_journal` reuse the same write-through. A startup
+`memory_summary` bootstrap injects a compact (≤600 char) profile + preferences +
+recent-index summary once into the loop context, local-first with proxy fallback.
+Everything is fail-open: when no selected backend is available, Iris runs and
+answers normally with no memory and never halts.
+
+The Shortcut treats memory content as user data, not instructions. The local
+file text (OKF Markdown, never JSON) is read as opaque text and never parsed;
+only the outer proxy JSON envelope is coerced with `getDictionary()` — the
+`records` text is forwarded to the planner opaquely. Relevant snippets may be
+sent to the model, so the runtime avoids dumping the whole store into prompts.
 
 ## Siri Invocation
 
@@ -134,7 +181,8 @@ shortcut can work with:
 - Text or URLs shared into the shortcut.
 - Clipboard input when the user allows it.
 - Native Shortcuts actions available on that device.
-- Phone-local OKF memory that the user created or approved.
+- Hybrid OKF memory (phone-local Files and/or the proxy Google Sheet) that the
+  user created or approved.
 
 It cannot automatically inspect all apps, Gmail, emails, messages, or screen
 contents unless Apple or the third-party app exposes those inputs through

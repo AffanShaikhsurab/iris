@@ -52,12 +52,13 @@ def validate_config(config: dict[str, Any]) -> None:
         "model.dtype": "bfloat16",
         "model.upstream_template_sha256": UPSTREAM_TEMPLATE_SHA256,
         "model.training_template_sha256": TRAINING_TEMPLATE_SHA256,
-        "train.gradient_checkpointing": True,
         "train.packing": False,
         "train.assistant_only_loss": True,
     }
     for dotted, expected in exact.items():
         _require(config, dotted, expected)
+    if not isinstance(config.get("train", {}).get("gradient_checkpointing"), bool):
+        raise ConfigError("train.gradient_checkpointing must be true or false")
     method = config["peft"].get("method")
     qlora = config["peft"].get("qlora", {}).get("enabled") is True
     if method not in {"lora", "qlora", "full"}:
@@ -222,8 +223,9 @@ def run(config_path: Path) -> None:
             ),
         )
     model.config.use_cache = False
-    model.enable_input_require_grads()
-    model.gradient_checkpointing_enable(gradient_checkpointing_kwargs={"use_reentrant": False})
+    if config["train"]["gradient_checkpointing"]:
+        model.enable_input_require_grads()
+        model.gradient_checkpointing_enable(gradient_checkpointing_kwargs={"use_reentrant": False})
     train_rows = _dataset_rows(train_file, tokenizer, template, 4096)
     eval_rows = _dataset_rows(eval_file, tokenizer, template, 4096)
 
@@ -282,7 +284,8 @@ def run(config_path: Path) -> None:
         per_device_train_batch_size=train["per_device_train_batch_size"],
         per_device_eval_batch_size=train["per_device_eval_batch_size"],
         gradient_accumulation_steps=train["gradient_accumulation_steps"],
-        gradient_checkpointing=True,
+        gradient_checkpointing=train["gradient_checkpointing"],
+        group_by_length=True,
         bf16=True,
         tf32=True,
         eval_strategy="steps",

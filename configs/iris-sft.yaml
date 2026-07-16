@@ -1,0 +1,55 @@
+schema_version: 1
+model:
+  id: openbmb/MiniCPM5-1B
+  revision: 4e9de7a0778dc1c362e983e6858f0e77542cbdca
+  tokenizer_revision: 4e9de7a0778dc1c362e983e6858f0e77542cbdca
+  trust_remote_code: false
+  allow_hub_download: false
+  mode: non-thinking
+  max_length: 4096
+  attention: sdpa
+  dtype: bfloat16
+  upstream_template_sha256: 7451a05cf1e28a79d97d7c0bc951028c0b1915119bf9046acd06a0e3d931f47c
+  training_template_sha256: c3a3f93fc404b41bd0e03aa4296ecfbe6c75be1526f902f82606abfb75cf710d
+  training_template: src/iris_training/templates/minicpm5_training.jinja
+peft:
+  method: lora
+  rank: 16
+  alpha: 32
+  dropout: 0.05
+  target_modules: all-linear
+  qlora:
+    enabled: false
+    quant_type: nf4
+    double_quant: true
+    compute_dtype: bfloat16
+train:
+  epochs: 3
+  learning_rate: 0.0001
+  per_device_train_batch_size: 2
+  per_device_eval_batch_size: 2
+  gradient_accumulation_steps: 8
+  gradient_checkpointing: true
+  packing: false
+  assistant_only_loss: true
+  warmup_ratio: 0.03
+  weight_decay: 0.01
+  max_grad_norm: 1.0
+  lr_scheduler_type: cosine
+  eval_steps: 100
+  save_steps: 100
+  logging_steps: 10
+  save_total_limit: 3
+  seed: 3407
+  max_runtime_seconds: 86400
+data:
+  fail_on_any_rejection: true
+  reject_assistant_truncation: true
+  require_nonempty_assistant_mask: true
+  preflight_report: /opt/ml/output/data/preflight-report.json
+paths:
+  train_channel: /opt/ml/input/data/train
+  eval_channel: /opt/ml/input/data/validation
+  model_channel: /opt/ml/input/data/model
+  checkpoints: /opt/ml/checkpoints
+  output: /opt/ml/model

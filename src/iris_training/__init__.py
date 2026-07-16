@@ -1,0 +1,7 @@
+"""Iris MiniCPM5 SageMaker training and deterministic evaluation."""
+
+MODEL_ID = "openbmb/MiniCPM5-1B"
+MODEL_REVISION = "4e9de7a0778dc1c362e983e6858f0e77542cbdca"
+UPSTREAM_TEMPLATE_SHA256 = "7451a05cf1e28a79d97d7c0bc951028c0b1915119bf9046acd06a0e3d931f47c"
+
+__all__ = ["MODEL_ID", "MODEL_REVISION", "UPSTREAM_TEMPLATE_SHA256"]

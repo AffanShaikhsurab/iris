@@ -1,0 +1,23 @@
+# The AWS DLC is immutable and supplies the validated Torch/CUDA stack.
+ARG BASE_IMAGE=763104351884.dkr.ecr.us-east-1.amazonaws.com/pytorch-training@sha256:196e771cb56ca9a6f7419ee46957e656e45829da4d103bb4a98daf045e2b56da
+FROM ${BASE_IMAGE}
+ARG BASE_IMAGE
+RUN test "$BASE_IMAGE" = "763104351884.dkr.ecr.us-east-1.amazonaws.com/pytorch-training@sha256:196e771cb56ca9a6f7419ee46957e656e45829da4d103bb4a98daf045e2b56da" \
+ && python -c 'import platform; assert platform.machine() == "x86_64"; assert platform.python_version() == "3.12.10"' \
+ && python -c 'import torch; assert torch.__version__.split("+")[0] == "2.7.1"; assert torch.version.cuda == "12.8"'
+
+COPY requirements.lock /opt/iris/requirements.lock
+RUN python -m pip install --no-cache-dir --no-deps --require-hashes -r /opt/iris/requirements.lock \
+ && python -m pip check \
+ && python -c 'import transformers, tokenizers, peft; assert transformers.__version__ == "4.57.3"; assert tokenizers.__version__ == "0.22.2"; assert peft.__version__ == "0.19.1"'
+
+COPY configs/ /opt/iris/configs/
+COPY src/ /opt/iris/src/
+ENV PYTHONPATH=/opt/iris/src \
+    PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    TOKENIZERS_PARALLELISM=false \
+    HF_HUB_OFFLINE=1 \
+    TRANSFORMERS_OFFLINE=1
+WORKDIR /opt/iris
+ENTRYPOINT ["python", "-m", "iris_training.train"]

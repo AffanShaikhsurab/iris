@@ -14,3 +14,17 @@ shortcuts/*.shortcut
 # (.env.local.example is the committed template and is intentionally tracked.)
 .env.local
 env.local
+
+# Internal research, planning, and copyrighted references (do not publish)
+docs/research-papers/
+docs/sagemaker-research/
+docs/on-device-model-research.md
+docs/context-engineering-plan.md
+
+# Local IDE / MCP settings
+.kiro/settings/
+
+# Experimental / scratch scripts
+scripts/bench_latency.py
+scripts/iris_replica.py
+scripts/session_sim.py

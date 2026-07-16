@@ -212,6 +212,7 @@ def run(config_path: Path) -> None:
             ),
         )
     model.config.use_cache = False
+    model.enable_input_require_grads()
     model.gradient_checkpointing_enable(gradient_checkpointing_kwargs={"use_reentrant": False})
     train_rows = _dataset_rows(train_file, tokenizer, template, 4096)
     eval_rows = _dataset_rows(eval_file, tokenizer, template, 4096)

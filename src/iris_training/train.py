@@ -143,7 +143,9 @@ def run(config_path: Path) -> None:
     config = load_config(config_path)
     run_id = os.environ.get("IRIS_RUN_ID", "local")
     attempt_id = os.environ.get("IRIS_ATTEMPT_ID", "local")
-    print(f"IRIS_EVENT phase=bootstrap status=start run_id={run_id} attempt_id={attempt_id}", flush=True)
+    is_main = int(os.environ.get("RANK", "0")) == 0
+    if is_main:
+        print(f"IRIS_EVENT phase=bootstrap status=start run_id={run_id} attempt_id={attempt_id}", flush=True)
     paths = {key: Path(value) for key, value in config["paths"].items()}
     model_dir = paths["model_channel"]
     _verify_local_model(model_dir)
@@ -154,8 +156,14 @@ def run(config_path: Path) -> None:
         TrainerCallback, TrainingArguments,
     )
 
-    if not torch.cuda.is_available() or torch.cuda.device_count() != 1:
-        raise RuntimeError("Iris baseline requires exactly one visible CUDA GPU")
+    if not torch.cuda.is_available():
+        raise RuntimeError("Iris training requires a visible CUDA GPU")
+    world_size = int(os.environ.get("WORLD_SIZE", "1"))
+    if world_size == 1 and torch.cuda.device_count() != 1:
+        raise RuntimeError(
+            "Single-process runs require exactly one visible GPU; set CUDA_VISIBLE_DEVICES=0 "
+            "for one GPU, or launch with torchrun --nproc_per_node=<N> for multi-GPU DDP"
+        )
     tokenizer = AutoTokenizer.from_pretrained(
         model_dir, local_files_only=True, trust_remote_code=False, use_fast=True
     )
@@ -168,17 +176,19 @@ def run(config_path: Path) -> None:
 
     from .preflight import build_report
     report = build_report(tokenizer, [train_file, eval_file], template, max_length=4096)
-    report_path = Path(config["data"]["preflight_report"])
-    report_path.parent.mkdir(parents=True, exist_ok=True)
-    report_path.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
     if not report["zero_rejected"]:
         raise RuntimeError("all-row preflight rejected data; GPU model loading refused")
-    print(
-        "IRIS_EVENT phase=data_preflight status=pass "
-        f"rows_train={report['files'][train_file.name]['accepted']} "
-        f"rows_eval={report['files'][eval_file.name]['accepted']}",
-        flush=True,
-    )
+    if is_main:
+        report_path = Path(config["data"]["preflight_report"])
+        report_path.parent.mkdir(parents=True, exist_ok=True)
+        report_path.write_text(json.dumps(report, indent=2, sort_keys=True) + "\n", encoding="utf-8")
+    if is_main:
+        print(
+            "IRIS_EVENT phase=data_preflight status=pass "
+            f"rows_train={report['files'][train_file.name]['accepted']} "
+            f"rows_eval={report['files'][eval_file.name]['accepted']}",
+            flush=True,
+        )
     method = config["peft"]["method"]
     model_kwargs: dict[str, Any] = {
         "local_files_only": True,
@@ -251,6 +261,8 @@ def run(config_path: Path) -> None:
         }
 
         def on_log(self, args: Any, state: Any, control: Any, logs: dict[str, Any] | None = None, **kwargs: Any) -> None:
+            if not state.is_world_process_zero:
+                return
             for source, target in self.metric_names.items():
                 value = (logs or {}).get(source)
                 if isinstance(value, (int, float)) and math.isfinite(float(value)):
@@ -287,7 +299,7 @@ def run(config_path: Path) -> None:
         save_safetensors=True,
         report_to=[],
         remove_unused_columns=False,
-        ddp_find_unused_parameters=None,
+        ddp_find_unused_parameters=False,
     )
     trainer = Trainer(
         model=model,
@@ -297,25 +309,26 @@ def run(config_path: Path) -> None:
         data_collator=collate,
         callbacks=[IrisMetricsCallback()],
     )
-    print("IRIS_EVENT phase=train status=start step=0", flush=True)
+    if is_main:
+        print("IRIS_EVENT phase=train status=start step=0", flush=True)
     result = trainer.train(resume_from_checkpoint=_latest_checkpoint(checkpoint_dir))
     output_dir = paths["output"]
     output_dir.mkdir(parents=True, exist_ok=True)
     trainer.save_model(output_dir)
-    tokenizer.save_pretrained(output_dir)
-
-    from .artifacts import sha256_file, write_manifest
-    manifest_path = write_manifest(
-        output_dir,
-        config_path=config_path,
-        training_template=template_path,
-        dataset_hashes={"train": sha256_file(train_file), "validation": sha256_file(eval_file)},
-        extra={"metrics": result.metrics, "plan": training_plan(config)},
-    )
-    print(
-        f"IRIS_EVENT phase=finalize status=pass artifact_sha256={sha256_file(manifest_path)}",
-        flush=True,
-    )
+    if trainer.is_world_process_zero():
+        tokenizer.save_pretrained(output_dir)
+        from .artifacts import sha256_file, write_manifest
+        manifest_path = write_manifest(
+            output_dir,
+            config_path=config_path,
+            training_template=template_path,
+            dataset_hashes={"train": sha256_file(train_file), "validation": sha256_file(eval_file)},
+            extra={"metrics": result.metrics, "plan": training_plan(config)},
+        )
+        print(
+            f"IRIS_EVENT phase=finalize status=pass artifact_sha256={sha256_file(manifest_path)}",
+            flush=True,
+        )
 def parse_args() -> argparse.Namespace:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--config", type=Path, default=DEFAULT_CONFIG)

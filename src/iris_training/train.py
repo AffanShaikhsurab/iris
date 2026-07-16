@@ -311,7 +311,8 @@ def run(config_path: Path) -> None:
     )
     if is_main:
         print("IRIS_EVENT phase=train status=start step=0", flush=True)
-    result = trainer.train(resume_from_checkpoint=_latest_checkpoint(checkpoint_dir))
+    resume = _latest_checkpoint(checkpoint_dir) if os.environ.get("IRIS_RESUME") == "1" else None
+    result = trainer.train(resume_from_checkpoint=resume)
     output_dir = paths["output"]
     output_dir.mkdir(parents=True, exist_ok=True)
     trainer.save_model(output_dir)

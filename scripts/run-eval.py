@@ -117,7 +117,10 @@ def main() -> int:
 
     results: list[dict[str, Any]] = []
     outputs: list[dict[str, Any]] = []
-    for line_number, raw in rows:
+    total = len(rows)
+    for done, (line_number, raw) in enumerate(rows, 1):
+        if done == 1 or done % 25 == 0 or done == total:
+            print(f"[{done}/{total}] scoring...", file=sys.stderr, flush=True)
         location = f"{args.eval_file.name}:{line_number}"
         case, prompt_messages = build_case(raw, location)
         raw_completion = generate(prompt_messages, case["tools"])

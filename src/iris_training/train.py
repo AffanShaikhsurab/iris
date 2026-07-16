@@ -258,7 +258,7 @@ def run(config_path: Path) -> None:
     train = config["train"]
     checkpoint_dir = paths["checkpoints"]
     checkpoint_dir.mkdir(parents=True, exist_ok=True)
-    tensorboard_dir = Path("/opt/ml/output/tensorboard")
+    tensorboard_dir = Path(os.environ.get("IRIS_TENSORBOARD_DIR", "/opt/ml/output/tensorboard"))
     tensorboard_dir.mkdir(parents=True, exist_ok=True)
     arguments = TrainingArguments(
         output_dir=str(checkpoint_dir),

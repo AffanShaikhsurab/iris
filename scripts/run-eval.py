@@ -10,9 +10,12 @@ from __future__ import annotations
 
 import argparse
 import json
+import re
 import sys
 from pathlib import Path
 from typing import Any
+
+CONTROL_TOKEN = re.compile(r"<\|[^|]*?\|>")
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
@@ -98,9 +101,13 @@ def main() -> int:
                 do_sample=False,
                 pad_token_id=tokenizer.pad_token_id,
             )
-        completion = tokenizer.decode(
-            generated[0][inputs["input_ids"].shape[1]:], skip_special_tokens=True
+        raw_completion = tokenizer.decode(
+            generated[0][inputs["input_ids"].shape[1]:], skip_special_tokens=False
         )
+        completion = CONTROL_TOKEN.sub("", raw_completion)
+        if tokenizer.eos_token:
+            completion = completion.replace(tokenizer.eos_token, "")
+        completion = completion.strip()
         outputs.append({"case_id": case["case_id"], "output": completion})
         results.append(evaluate_case(case, completion))
 

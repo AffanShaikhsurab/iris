@@ -60,6 +60,7 @@ def _parse_envelope(value: Any) -> ParseResult:
 
 def _parse_xml(raw: str) -> ParseResult:
     body = re.sub(r"^\s*<think>\s*</think>\s*", "", raw, count=1)
+    body = re.sub(r"&(?!(?:amp|lt|gt|quot|apos|#\d+|#x[0-9A-Fa-f]+);)", "&amp;", body)
     try:
         root = ET.fromstring(f"<root>{body}</root>")
     except ET.ParseError as exc:

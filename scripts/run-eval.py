@@ -90,7 +90,7 @@ def main() -> int:
             add_generation_prompt=True,
             tokenize=False,
         )
-        inputs = tokenizer(text, return_tensors="pt").to("cuda")
+        inputs = tokenizer(text, return_tensors="pt", return_token_type_ids=False).to("cuda")
         with torch.no_grad():
             generated = model.generate(
                 **inputs,

@@ -78,12 +78,17 @@ def main() -> int:
             model_path=str(args.gguf), n_ctx=4096, verbose=False,
             n_gpu_layers=int(os.environ.get("IRIS_GGUF_GPU_LAYERS", "0")),
         )
+        stop_ids = {llm.token_eos()}
+        for marker in ("<|im_end|>", "<|endoftext|>"):
+            ids = llm.tokenize(marker.encode("utf-8"), add_bos=False, special=True)
+            if len(ids) == 1:
+                stop_ids.add(ids[0])
 
         def generate(prompt_messages: list[dict[str, Any]], tools: list[dict[str, Any]]) -> str:
             tokens = llm.tokenize(render(prompt_messages, tools).encode("utf-8"), add_bos=False, special=True)
             produced: list[int] = []
             for token in llm.generate(tokens, temp=0.0):
-                if token == llm.token_eos() or len(produced) >= args.max_new_tokens:
+                if token in stop_ids or len(produced) >= args.max_new_tokens:
                     break
                 produced.append(token)
             return llm.detokenize(produced, special=True).decode("utf-8", errors="ignore")
@@ -127,6 +132,10 @@ def main() -> int:
         completion = CONTROL_TOKEN.sub("", raw_completion)
         if tokenizer.eos_token:
             completion = completion.replace(tokenizer.eos_token, "")
+        for boundary in ("\nassistant", "\nuser", "\ntool", "\nsystem"):
+            cut = completion.find(boundary)
+            if cut != -1:
+                completion = completion[:cut]
         completion = completion.strip()
         outputs.append({"case_id": case["case_id"], "output": completion})
         results.append(evaluate_case(case, completion))

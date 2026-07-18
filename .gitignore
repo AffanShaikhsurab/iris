@@ -5,6 +5,7 @@ build/
 *_processed.cherri
 __pycache__/
 .pytest_cache/
+.hypothesis/
 tmp/
 
 # Compiled shortcut artifacts belong in dist/; keep shortcuts/ source-only.

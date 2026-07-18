@@ -1,0 +1,83 @@
+"""Integrations with model, training, and evaluation systems."""
+
+from .contracts import (
+    ActiveRepresentation,
+    BINARY_BODY_ROLES,
+    BinaryLinearFactory,
+    BinaryScope,
+    ModelAdapter,
+    NamedActiveRepresentation,
+    TensorDescriptor,
+    TensorRole,
+    TensorScope,
+)
+from .iris_evaluation import (
+    IrisEvaluationEvidence,
+    IrisEvaluationPanel,
+    IrisEvaluatorAdapter,
+    aggregate_iris,
+    build_iris_case,
+    evaluate_iris_case,
+    extract_generated_completion,
+    score_iris_outputs,
+    write_iris_evidence,
+)
+from .linear import (
+    BinaryLinear,
+    BinaryLinearConfig,
+    ConfiguredBinaryLinearFactory,
+    TrainingActivationMode,
+)
+from .small_models import (
+    LoadedSmallModel,
+    LocalSmallModelRequest,
+    PYTHIA_70M,
+    Pythia70MAdapter,
+    SMOLLM_135M,
+    SmallModelRegistration,
+    SmallModelUse,
+    SmolLM135MAdapter,
+)
+from .tiny import (
+    TinyCausalLM,
+    TinyCausalLMConfig,
+    TinyCausalModelAdapter,
+    build_seeded_tiny_causal_lm,
+)
+
+__all__ = [
+    "ActiveRepresentation",
+    "BINARY_BODY_ROLES",
+    "BinaryLinear",
+    "BinaryLinearConfig",
+    "BinaryLinearFactory",
+    "BinaryScope",
+    "ConfiguredBinaryLinearFactory",
+    "IrisEvaluationEvidence",
+    "IrisEvaluationPanel",
+    "IrisEvaluatorAdapter",
+    "LoadedSmallModel",
+    "LocalSmallModelRequest",
+    "ModelAdapter",
+    "NamedActiveRepresentation",
+    "PYTHIA_70M",
+    "Pythia70MAdapter",
+    "SMOLLM_135M",
+    "SmallModelRegistration",
+    "SmallModelUse",
+    "SmolLM135MAdapter",
+    "TensorDescriptor",
+    "TensorRole",
+    "TensorScope",
+    "TinyCausalLM",
+    "TinyCausalLMConfig",
+    "TinyCausalModelAdapter",
+    "TrainingActivationMode",
+    "aggregate_iris",
+    "build_iris_case",
+    "build_seeded_tiny_causal_lm",
+    "evaluate_iris_case",
+    "extract_generated_completion",
+    "score_iris_outputs",
+    "write_iris_evidence",
+]

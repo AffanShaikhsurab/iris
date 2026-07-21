@@ -352,16 +352,18 @@ function memoryStatus(req) {
   return _env('memory_status', true, n, 'Memory is available.', '', '');
 }
 
-// Compact bootstrap summary for turn-one injection: profile + preferences +
-// the last few index lines, hard-capped at 600 chars so it never fattens every
-// planner call toward the ~25s Siri budget.
+// Standing profile summary injected on EVERY planner turn: profile + preferences
+// + the last few index lines. Capped at 10000 chars (~2.1-2.4k tokens) - the
+// profile is the most important standing context for a personal assistant, and
+// this is a small slice of Iris's 60k working budget (bench-verified ~2s even at
+// 60k). The client applies the same 10000-char cap.
 function memorySummary(req) {
   var parts = []
     .concat(_readTopic('profile'))
     .concat(_readTopic('preferences'))
     .concat(_readTopic('index').slice(-3));
   var text = parts.join('; ');
-  if (text.length > 600) { text = text.slice(0, 600); }
+  if (text.length > 10000) { text = text.slice(0, 10000); }
   return _env('memory_summary', true, parts.length, 'Memory summary.', text, '');
 }
 

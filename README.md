@@ -65,6 +65,12 @@ Shortcuts. See [supported routes](docs/routes.md).
 
 ## Get started
 
+**New here? Follow the [complete setup guide](docs/setup-guide.md)** — one page,
+start to finish: import the shortcut, paste your key, choose where memory is
+stored (phone vs Google Sheet), deploy the optional cloud backend, run the
+"Allow All" permission primer, and set up the proactive morning/evening/weekly
+automations. The quick version is below.
+
 ### On your iPhone (~10 minutes)
 
 1. **Get the Shortcut** — download a signed build from the latest

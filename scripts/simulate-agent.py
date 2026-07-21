@@ -47,7 +47,7 @@ import urllib.request
 # --- Constants copied VERBATIM from shortcuts/iris.cherri ---
 NIM_URL = "https://integrate.api.nvidia.com/v1/chat/completions"
 # Mirrors iris.cherri @nimModelIdRaw: a capable, non-reasoning instruct model.
-DEFAULT_MODEL = "meta/llama-4-maverick-17b-128e-instruct"
+DEFAULT_MODEL = "mistralai/mistral-small-4-119b-2603"
 MAX_TURNS = 50
 MAX_TOOL_CALLS = 3
 MAX_USER_QUESTIONS = 2
@@ -57,8 +57,8 @@ MAX_USER_QUESTIONS = 2
 # request) reaches ~80% of the latency-safe working budget, NOT on a fixed
 # follow-up-exchange count.
 MODEL_CONTEXT_TOKENS = 128000
-CONTEXT_TOKEN_BUDGET = 12000
-COMPACT_AT_TOKENS = 9600
+CONTEXT_TOKEN_BUDGET = 60000  # bench-verified: ~59k prompt returns in ~2s on the pinned fast models
+COMPACT_AT_TOKENS = 60000
 COMPACT_SYSTEM = (
     "You compress a running voice-assistant conversation into a short handoff so "
     "it can continue seamlessly. Preserve the user's overall goal, the MOST "
@@ -761,12 +761,15 @@ def scenarios():
                           "another", "no thanks"],
                  asserts={"no_ask_user": True, "no_turn_exhaustion": True}),
         # Token-based compaction: a large running context (seeded past the
-        # ~9600-token trigger) is compacted into one summary on the next turn.
+        # ~60k-token @compactAtTokens trigger) is compacted into one summary on
+        # the next turn.
         Scenario("token_compaction", "keep going",
                  replies=["no thanks"],
+                 # ~37 chars * 7000 ~= 259k chars ~= 64k tokens, past the ~60k
+                 # @compactAtTokens trigger so compaction fires on the next turn.
                  seed_context=("\n\nprevious_exchange=\nuser_said=tell me a story"
                                "\nassistant_answered=" +
-                               ("Once upon a time in a faraway place. " * 1200)),
+                               ("Once upon a time in a faraway place. " * 7000)),
                  asserts={"expect_compaction": True, "first_type": "final_answer"}),
         # Follow-up context (Bug 2): "when is the next match" -> web_search ->
         # "tell me more about that match". After the follow-up the planner's

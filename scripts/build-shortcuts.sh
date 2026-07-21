@@ -45,7 +45,7 @@ if env_path.exists():
             injected += 1
     model = env.get("NIM_MODEL_ID", "")
     if real(model):
-        text = text.replace('text("meta/llama-3.1-8b-instruct")', f'text("{model}")')
+        text = text.replace('text("mistralai/mistral-small-4-119b-2603")', f'text("{model}")')
     if injected or real(model):
         sys.stderr.write(
             f"[build] .env.local found: injected {injected} credential(s) into "

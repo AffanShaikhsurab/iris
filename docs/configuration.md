@@ -1,6 +1,53 @@
 # Configuration
 
+> New to Iris? Start with the **[setup guide](setup-guide.md)** — a single
+> ordered walkthrough. This page is the reference for each individual setting.
+
 Iris intentionally does not commit secrets.
+
+## Standing location (tell Iris where you are)
+
+Iris can keep your home area in its context on every request, so "what's good
+near me", weather, and maps queries resolve without asking where you are, and the
+model can add your area to web/maps searches. Set it once: in the Shortcuts
+editor, find the Text action whose value is empty and labelled in the source as
+the region box (it sits just below the memory backend box), and type your area,
+for example:
+
+```text
+Belagavi, Karnataka, India
+```
+
+Leave it empty to send no location. This is a **stored** region on purpose — a
+live GPS fix on every run would add latency and can stall a locked hands-free
+Siri run. A live location is still available on demand (Iris calls its
+`current_location_summary` tool when you explicitly ask "where am I").
+
+## Choosing where memory is stored (local vs cloud)
+
+Iris can remember things you tell it, and you decide **where** those notes live.
+The choice is a single editable Text action at the top of the shortcut — find the
+box whose value is exactly `hybrid` (it sits just below the proxy URL/secret
+boxes) and set it to one of:
+
+| Value | Storage | When to use |
+|---|---|---|
+| `hybrid` *(default)* | Phone-local Files **and** a Google Sheet (write local first, mirror to the Sheet; read local-first with Sheet fallback) | Safest default: fast local reads plus a cloud copy that survives an iCloud-full sync loss. |
+| `local` | Phone-local Files only (`Shortcuts/IrisOKF/`) | Fully on-device/offline, no Google. |
+| `sheets` | Google Sheet only, via the Apps Script backend | Memory you can read/edit from a computer or another agent; immune to iCloud quota. |
+
+Details and rationale:
+
+- The cloud half (`sheets`, and the Sheet mirror in `hybrid`) only activates once
+  the Apps Script proxy is configured (see
+  [apps-script-proxy.md](apps-script-proxy.md) and the setup guide). Until then,
+  `hybrid` effectively behaves like `local`, and `sheets` has nowhere to write.
+- Any unrecognized value falls back to `hybrid`.
+- The selector is set **once in the editor**, not asked per run: a spoken
+  "local or cloud?" prompt every run would gate the hands-free happy path and
+  can't be persisted (see [shortcut-runtime-flow.md](shortcut-runtime-flow.md)).
+- Memory is always **fail-open** — if the selected backend is unavailable, Iris
+  still runs and answers, just without memory that turn.
 
 ## Default Backend: NVIDIA NIM (build.nvidia.com)
 
@@ -23,12 +70,21 @@ Setup:
    shortcut. If the shortcut is run before this is done, it speaks these setup
    instructions and stops instead of failing.
 3. The second Text action holds the model id. The default is
-   `meta/llama-3.1-8b-instruct` — chosen for latency, not capability. iOS
-   gives `Get Contents of URL` a fixed, non-configurable timeout around 25
+   `mistralai/mistral-small-4-119b-2603` — chosen for latency, not capability.
+   iOS gives `Get Contents of URL` a fixed, non-configurable timeout around 25
    seconds (and the Siri voice path is less patient), while NIM's free tier
    frequently serves popular big models slowly under load (30+ second
    responses, occasional 504s). A slow call surfaces as "the request timed
    out" in the app and "Something went wrong" from Siri.
+
+   > **If Siri says "something went wrong" but manual runs work, suspect a slow
+   > model first.** Free-tier latency for a given model drifts over time: the
+   > earlier default `meta/llama-4-maverick-17b-128e-instruct` was ~0.7s at
+   > first and later measured ~20s (2026-07) — under Siri's tighter patience
+   > that fails, while a manual run barely survives the ~25s budget. Swap the
+   > model id for a low-baseline one (e.g. `mistralai/ministral-14b-instruct-2512`
+   > ~0.9s, or `openai/gpt-oss-20b` ~1.2s) and re-test. `python tmp/test_models.py`
+   > measures current latencies against your own key.
 
 Model selection rules (any `provider/model-name` id from the catalog works):
 

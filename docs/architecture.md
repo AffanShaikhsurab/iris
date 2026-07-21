@@ -79,11 +79,13 @@ the ~25s iOS timeout (and degrades accuracy). To bound it, compaction fires on
 **estimated token usage** rather than a fixed exchange count. Each turn the
 Shortcut estimates the outgoing prompt size — `count(@protocol) +
 count(@loopContext) + count(@currentRequest)`, divided by 4 as a cheap
-chars-to-tokens heuristic — and when that reaches `@compactAtTokens` (9600,
-about 80% of a latency-safe ~12k working budget) it makes one extra model call
-that summarizes the running conversation into a short handoff, then replaces the
-raw log with that summary. The working budget is deliberately far below the
-model's true 128k window so every call still returns within the ~25s iOS budget.
+chars-to-tokens heuristic — and when that reaches `@compactAtTokens` (60000, the
+latency-safe working budget) it makes one extra model call that summarizes the
+running conversation into a short handoff, then replaces the raw log with that
+summary. The 60k budget is set from measurement, not from the model's 128k
+window: benchmarking (`tmp/bench_context.py`, `docs/context-engineering-plan.md`
+§0.2) showed the pinned fast models answer a ~59k-token prompt in ~2s — well
+inside the ~25s iOS budget — while high-variance models are excluded.
 The summary prompt is instructed to preserve named entities and specifics
 (proper nouns, titles, numbers, the most recent request, any "that X"
 antecedent) so follow-up references survive. Compaction runs only on a follow-up
@@ -160,8 +162,12 @@ journal` (default `log`), and both stores self-heal on the first write. The
 model-facing surface stays `memory_append(topic, body)` only — `type`/`title`/
 `tags` are derived by the storage layer, keeping the planner prompt compact.
 `create_note` and `quick_journal` reuse the same write-through. A startup
-`memory_summary` bootstrap injects a compact (≤600 char) profile + preferences +
-recent-index summary once into the loop context, local-first with proxy fallback.
+`memory_summary` bootstrap builds a compact (≤10000 char, ~2.1-2.4k tokens)
+profile + preferences summary (local-first with proxy fallback) and injects it as
+a **standing** `user_profile=` line on **every** planner turn (context
+engineering, Phase 2) —
+not a one-shot line in the loop context, so it survives compaction and is not
+diluted by later observations. It is labelled data, never instructions.
 Everything is fail-open: when no selected backend is available, Iris runs and
 answers normally with no memory and never halts.
 

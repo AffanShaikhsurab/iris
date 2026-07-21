@@ -43,8 +43,11 @@ SIMULATE_AGENT = REPO_ROOT / "scripts" / "simulate-agent.py"
 PHONE_PLIST_JSON = REPO_ROOT / "tmp" / "iris-newshortcut6.plist.json"
 
 # The capable, non-reasoning instruct model the fix selects (design Decision 5).
-FIXED_PRIMARY_MODEL = "mistralai/mistral-small-3.1-24b-instruct-2503"
-FIXED_FALLBACK_MODEL = "qwen/qwen2.5-7b-instruct"
+# Updated 2026-07 to the researched primary actually pinned in iris.cherri: the
+# earlier mistral-small-3.1-24b id was RETIRED from the NIM catalog (404), so the
+# shortcut moved to mistral-small-4-119b-2603 (see the @nimModelIdRaw comment).
+FIXED_PRIMARY_MODEL = "mistralai/mistral-small-4-119b-2603"
+FIXED_FALLBACK_MODEL = "openai/gpt-oss-20b"
 WEAK_DEFAULT_MODEL = "meta/llama-3.1-8b-instruct"
 
 
@@ -295,11 +298,12 @@ def test_bug3_named_entity_survives_compaction(sim):
     lockstep with task 4 / Design Decision 4 - same Property, new trigger.)
     """
     entity = "Estadio Azteca"
-    # Seed a large running context (well past the ~9600-token trigger) that
-    # mentions the entity, so the token-based compaction fires on the next turn.
+    # Seed a large running context (well past the ~60k-token @compactAtTokens
+    # trigger: ~59 chars * 5000 ~= 295k chars ~= 73k tokens) that mentions the
+    # entity, so the token-based compaction fires on the next turn.
     seed = ("\n\nprevious_exchange=\nuser_said=tell me about a famous stadium"
             f"\nassistant_answered=A famous one is the {entity} in Mexico City. "
-            + ("The crowd, the history, the atmosphere were all discussed. " * 1200))
+            + ("The crowd, the history, the atmosphere were all discussed. " * 5000))
     scenario = sim.Scenario(
         "entity_compaction",
         "tell me more about that",  # follow-up style current request, no entity

@@ -1,0 +1,1826 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>From y = mx + c to Transformers to 1-bit Weights — An Interactive Bottom-Up Guide</title>
+<style>
+  :root {
+    --bg: #0d1117;
+    --panel: #161b22;
+    --panel-2: #1c2330;
+    --border: #2d3543;
+    --text: #e6edf3;
+    --muted: #9aa7b4;
+    --accent: #58a6ff;
+    --accent-2: #7ee787;
+    --warn: #f0883e;
+    --pink: #ff7b9c;
+    --purple: #bc8cff;
+    --mono: "SF Mono", ui-monospace, "Cascadia Code", Consolas, monospace;
+    --sans: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+  }
+  * { box-sizing: border-box; }
+  html { scroll-behavior: smooth; }
+  body {
+    margin: 0;
+    background: var(--bg);
+    color: var(--text);
+    font-family: var(--sans);
+    line-height: 1.65;
+    font-size: 16px;
+  }
+  a { color: var(--accent); text-decoration: none; }
+  a:hover { text-decoration: underline; }
+
+  /* Layout */
+  .shell { display: flex; min-height: 100vh; }
+  nav.toc {
+    width: 290px;
+    flex-shrink: 0;
+    background: var(--panel);
+    border-right: 1px solid var(--border);
+    position: sticky;
+    top: 0;
+    height: 100vh;
+    overflow-y: auto;
+    padding: 22px 16px 60px;
+  }
+  nav.toc h2 {
+    font-size: 13px;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: var(--muted);
+    margin: 18px 0 8px;
+  }
+  nav.toc .brand {
+    font-size: 15px;
+    font-weight: 700;
+    color: var(--text);
+    margin-bottom: 4px;
+  }
+  nav.toc .brand small { display:block; font-weight: 400; color: var(--muted); font-size: 12px; }
+  nav.toc ol { list-style: none; padding: 0; margin: 0; counter-reset: item; }
+  nav.toc ol li { margin: 2px 0; }
+  nav.toc ol li a {
+    display: block;
+    padding: 5px 10px;
+    border-radius: 6px;
+    color: var(--muted);
+    font-size: 13.5px;
+    border-left: 2px solid transparent;
+  }
+  nav.toc ol li a:hover { background: var(--panel-2); color: var(--text); text-decoration: none; }
+  nav.toc ol li a.active { color: var(--accent); border-left-color: var(--accent); background: var(--panel-2); }
+
+  main {
+    flex: 1;
+    max-width: 940px;
+    margin: 0 auto;
+    padding: 40px 44px 120px;
+    min-width: 0;
+  }
+
+  header.hero {
+    padding: 30px 0 26px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 26px;
+  }
+  header.hero h1 { font-size: 34px; line-height: 1.2; margin: 0 0 10px; }
+  header.hero p.lead { font-size: 17px; color: var(--muted); margin: 0; max-width: 720px; }
+  .pill {
+    display:inline-block; font-size:12px; padding:3px 10px; border-radius:999px;
+    background: var(--panel-2); border:1px solid var(--border); color: var(--muted);
+    margin-right:6px; margin-bottom: 6px;
+  }
+
+  section { margin: 46px 0; scroll-margin-top: 20px; }
+  section > h2 {
+    font-size: 26px;
+    margin: 0 0 6px;
+    padding-bottom: 8px;
+    border-bottom: 1px solid var(--border);
+  }
+  section .step-tag {
+    display:inline-block; font-family: var(--mono); font-size: 12px; color: var(--accent-2);
+    letter-spacing: 0.05em; margin-bottom: 6px;
+  }
+  h3 { font-size: 19px; margin: 28px 0 8px; color: var(--text); }
+  p { margin: 12px 0; }
+  .muted { color: var(--muted); }
+
+  /* Cards / panels */
+  .card {
+    background: var(--panel);
+    border: 1px solid var(--border);
+    border-radius: 12px;
+    padding: 20px;
+    margin: 18px 0;
+  }
+  .card.demo { background: linear-gradient(180deg, var(--panel) 0%, var(--panel-2) 100%); }
+  .demo-title {
+    font-size: 13px; text-transform: uppercase; letter-spacing: 0.08em;
+    color: var(--accent); margin: 0 0 14px; font-weight: 700;
+  }
+  .demo-title::before { content: "▶ "; font-size: 10px; }
+
+  /* Math blocks */
+  .math {
+    font-family: var(--mono);
+    background: #0b0f14;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    padding: 14px 16px;
+    margin: 14px 0;
+    font-size: 15px;
+    color: var(--accent-2);
+    overflow-x: auto;
+    white-space: pre;
+  }
+  code.inline {
+    font-family: var(--mono);
+    background: var(--panel-2);
+    border: 1px solid var(--border);
+    border-radius: 5px;
+    padding: 1px 6px;
+    font-size: 14px;
+    color: var(--pink);
+  }
+
+  /* Controls */
+  .controls { display: grid; gap: 14px; margin: 8px 0 16px; }
+  .ctrl { display: grid; grid-template-columns: 130px 1fr 70px; align-items: center; gap: 12px; }
+  .ctrl label { font-family: var(--mono); font-size: 13px; color: var(--muted); }
+  .ctrl output { font-family: var(--mono); font-size: 14px; color: var(--accent); text-align: right; }
+  input[type=range] { width: 100%; accent-color: var(--accent); }
+  button.btn {
+    background: var(--accent); color: #04121f; border: none; border-radius: 7px;
+    padding: 8px 16px; font-weight: 700; cursor: pointer; font-size: 14px;
+  }
+  button.btn:hover { filter: brightness(1.1); }
+  button.btn.ghost { background: var(--panel-2); color: var(--text); border: 1px solid var(--border); }
+
+  canvas { max-width: 100%; display: block; background: #0b0f14; border-radius: 8px; border: 1px solid var(--border); }
+
+  .flex { display: flex; gap: 18px; flex-wrap: wrap; align-items: flex-start; }
+  .flex > * { flex: 1; min-width: 260px; }
+
+  .readout {
+    font-family: var(--mono); font-size: 14px; background: #0b0f14;
+    border: 1px solid var(--border); border-radius: 8px; padding: 12px 14px; color: var(--text);
+  }
+  .readout .k { color: var(--muted); }
+  .readout .v { color: var(--accent-2); }
+
+  table.grid { border-collapse: collapse; font-family: var(--mono); font-size: 13px; }
+  table.grid td { border: 1px solid var(--border); padding: 6px 10px; text-align: center; min-width: 44px; }
+  table.grid .lbl { color: var(--muted); border: none; }
+
+  .note {
+    border-left: 3px solid var(--accent); background: var(--panel-2);
+    padding: 12px 16px; border-radius: 0 8px 8px 0; margin: 16px 0;
+  }
+  .note.warn { border-left-color: var(--warn); }
+  .note.key { border-left-color: var(--accent-2); }
+  .note b { color: var(--text); }
+
+  .kbd { font-family: var(--mono); font-size: 12px; background:#0b0f14; padding:1px 6px; border-radius:4px; border:1px solid var(--border); }
+
+  footer { border-top: 1px solid var(--border); padding: 24px 0; color: var(--muted); font-size: 13px; }
+
+  .tokchip {
+    display:inline-block; font-family: var(--mono); padding: 4px 10px; border-radius: 6px;
+    background: var(--panel-2); border:1px solid var(--border); margin: 3px;
+  }
+
+  @media (max-width: 900px) {
+    nav.toc { display: none; }
+    main { padding: 24px 18px 80px; }
+    .ctrl { grid-template-columns: 100px 1fr 60px; }
+  }
+</style>
+</head>
+<body>
+<div class="shell">
+  <nav class="toc">
+    <div class="brand">Neural Nets → Transformers → 1-bit<small>Interactive bottom-up guide</small></div>
+    <h2>Foundations</h2>
+    <ol>
+      <li><a href="#s0">0 · How to read this</a></li>
+      <li><a href="#s1">1 · The line: y = mx + c</a></li>
+      <li><a href="#s2">2 · A line is a neuron</a></li>
+      <li><a href="#s3">3 · Many inputs: weighted sum</a></li>
+      <li><a href="#s4">4 · Activation: adding a bend</a></li>
+    </ol>
+    <h2>Networks</h2>
+    <ol>
+      <li><a href="#s5">5 · A layer = a matrix</a></li>
+      <li><a href="#s6">6 · Matrix multiply, visually</a></li>
+      <li><a href="#s7">7 · Stacking layers (MLP)</a></li>
+      <li><a href="#s8">8 · How the model learns</a></li>
+    </ol>
+    <h2>Toward Transformers</h2>
+    <ol>
+      <li><a href="#s9">9 · Sequences & tokens</a></li>
+      <li><a href="#s10">10 · Embeddings</a></li>
+      <li><a href="#s11">11 · Q, K, V projections</a></li>
+      <li><a href="#s12">12 · Attention scores</a></li>
+      <li><a href="#s13">13 · Softmax & weighted values</a></li>
+      <li><a href="#s14">14 · Multi-head attention</a></li>
+      <li><a href="#s15">15 · Positional encoding</a></li>
+      <li><a href="#s16">16 · The FFN & the block</a></li>
+      <li><a href="#s17">17 · The full architecture</a></li>
+    </ol>
+    <h2>Binary weights</h2>
+    <ol>
+      <li><a href="#s18">18 · Why compress?</a></li>
+      <li><a href="#s19">19 · What 1-bit means</a></li>
+      <li><a href="#s20">20 · Why Sign fails</a></li>
+      <li><a href="#s21">21 · Progressive F(x,t)</a></li>
+      <li><a href="#s22">22 · Scale S<sub>a</sub></a></li>
+      <li><a href="#s23">23 · Dual scales</a></li>
+      <li><a href="#s24">24 · Train vs serve</a></li>
+      <li><a href="#s25">25 · On the block</a></li>
+    </ol>
+  </nav>
+
+  <main>
+    <header class="hero">
+      <div>
+        <span class="pill">First principles</span>
+        <span class="pill">Interactive</span>
+        <span class="pill">No prior deep-learning needed</span>
+        <span class="pill">Works offline</span>
+      </div>
+      <h1>From <span style="font-family:var(--mono);color:var(--accent-2)">y = mx + c</span> to Transformers to 1-bit</h1>
+      <p class="lead">You remember the basics: weights, feed-forward, gradient descent, backprop. This guide rebuilds everything from the humble straight line, one concept at a time, until you can read <i>Attention Is All You Need</i> — and then see how BinaryLLM turns those same weight matrices into ±1 without training from scratch. Drag the sliders — every idea here is something you can poke.</p>
+    </header>
+
+    <!-- ============ 0 ============ -->
+    <section id="s0">
+      <span class="step-tag">START HERE</span>
+      <h2>0 · How to read this</h2>
+      <p>Every section introduces <b>one</b> new idea and reuses the idea before it. The chain is:</p>
+      <div class="math">line  →  neuron  →  weighted sum  →  activation  →  layer (matrix)
+     →  stacked layers  →  learning  →  embeddings
+     →  attention (Q,K,V)  →  multi-head  →  transformer block  →  the full model
+     →  1-bit weights  →  progressive F(x,t)  →  scales  →  Sign at inference</div>
+      <div class="note key">
+        <b>The single most important idea:</b> a neural network is almost entirely <b>matrix multiplication</b> — which is just a huge pile of the <code class="inline">w·x + b</code> you already know, arranged in a grid. Everything else (activations, attention, layer norm) is decoration around that core. Hold onto that and the rest falls into place.
+      </div>
+    </section>
+
+    <!-- ============ 1 ============ -->
+    <section id="s1">
+      <span class="step-tag">FOUNDATION</span>
+      <h2>1 · The line: y = mx + c</h2>
+      <p>Start with the equation you already know. A straight line takes one input <code class="inline">x</code>, scales it by a <b>slope</b> <code class="inline">m</code>, and shifts it by an <b>intercept</b> <code class="inline">c</code>:</p>
+      <div class="math">y = m·x + c</div>
+      <p><code class="inline">m</code> controls the <b>tilt</b> (how strongly x affects y). <code class="inline">c</code> controls the <b>offset</b> (where the line sits when x = 0). Drag them:</p>
+
+      <div class="card demo">
+        <p class="demo-title">Interactive line</p>
+        <div class="controls">
+          <div class="ctrl"><label>m (slope)</label><input id="l_m" type="range" min="-3" max="3" step="0.1" value="1"><output id="l_m_o">1.0</output></div>
+          <div class="ctrl"><label>c (intercept)</label><input id="l_c" type="range" min="-4" max="4" step="0.1" value="0"><output id="l_c_o">0.0</output></div>
+        </div>
+        <div class="flex">
+          <canvas id="l_canvas" width="440" height="320"></canvas>
+          <div>
+            <div class="readout" id="l_read"></div>
+            <p class="muted" style="margin-top:14px">Notice: with two knobs you can only ever make a <b>straight</b> line. That limitation is exactly why we'll later need activations and many neurons.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 2 ============ -->
+    <section id="s2">
+      <span class="step-tag">FOUNDATION</span>
+      <h2>2 · A line <i>is</i> a neuron</h2>
+      <p>Now rename the parts. In machine learning we call the slope a <b>weight</b> <code class="inline">w</code> and the intercept a <b>bias</b> <code class="inline">b</code>. Same equation, new clothes:</p>
+      <div class="math">y = w·x + b        (was: y = m·x + c)</div>
+      <p>That's the whole story of a single-input neuron. The weight says <i>"how much does this input matter, and in which direction?"</i> A positive weight pushes the output up as x grows; a negative weight pushes it down. The bias sets the baseline.</p>
+      <div class="note">
+        <b>Why "weight" is a good name:</b> think of a decision like "should I go outside?" The input <code class="inline">x</code> = temperature. If you love warm weather, temperature has a big positive weight. The bias is your mood before you even look outside.
+      </div>
+      <p>A neuron with one input is literally the line from Section 1. The leap to intelligence comes from giving it <b>many</b> inputs.</p>
+    </section>
+
+    <!-- ============ 3 ============ -->
+    <section id="s3">
+      <span class="step-tag">FOUNDATION</span>
+      <h2>3 · Many inputs: the weighted sum</h2>
+      <p>Real data has many features: pixels, words, sensor readings. Give the neuron several inputs <code class="inline">x₁, x₂, …, xₙ</code>, each with its own weight. The neuron multiplies each input by its weight, adds them all up, then adds one bias:</p>
+      <div class="math">y = w₁·x₁ + w₂·x₂ + w₃·x₃ + … + wₙ·xₙ + b</div>
+      <p>This is the <b>weighted sum</b> (also called a "dot product" plus bias). It is the single operation repeated billions of times inside every large model. Play with a 3-input neuron:</p>
+
+      <div class="card demo">
+        <p class="demo-title">A neuron with 3 inputs</p>
+        <div class="flex">
+          <div>
+            <h3 style="margin-top:0">Inputs</h3>
+            <div class="controls">
+              <div class="ctrl"><label>x₁</label><input id="n_x1" type="range" min="-2" max="2" step="0.1" value="1"><output id="n_x1_o">1.0</output></div>
+              <div class="ctrl"><label>x₂</label><input id="n_x2" type="range" min="-2" max="2" step="0.1" value="0.5"><output id="n_x2_o">0.5</output></div>
+              <div class="ctrl"><label>x₃</label><input id="n_x3" type="range" min="-2" max="2" step="0.1" value="-1"><output id="n_x3_o">-1.0</output></div>
+            </div>
+            <h3>Weights & bias</h3>
+            <div class="controls">
+              <div class="ctrl"><label>w₁</label><input id="n_w1" type="range" min="-2" max="2" step="0.1" value="0.8"><output id="n_w1_o">0.8</output></div>
+              <div class="ctrl"><label>w₂</label><input id="n_w2" type="range" min="-2" max="2" step="0.1" value="-1.5"><output id="n_w2_o">-1.5</output></div>
+              <div class="ctrl"><label>w₃</label><input id="n_w3" type="range" min="-2" max="2" step="0.1" value="0.3"><output id="n_w3_o">0.3</output></div>
+              <div class="ctrl"><label>b</label><input id="n_b" type="range" min="-2" max="2" step="0.1" value="0.2"><output id="n_b_o">0.2</output></div>
+            </div>
+          </div>
+          <div>
+            <canvas id="n_canvas" width="440" height="300"></canvas>
+            <div class="readout" id="n_read" style="margin-top:12px"></div>
+          </div>
+        </div>
+      </div>
+      <div class="note key">
+        <b>Key reframe:</b> the list of inputs <code class="inline">[x₁,x₂,x₃]</code> is a <b>vector</b>. The list of weights <code class="inline">[w₁,w₂,w₃]</code> is a vector. The weighted sum is their <b>dot product</b>. Remember this — attention scores in a transformer are dot products too.
+      </div>
+    </section>
+
+    <!-- ============ 4 ============ -->
+    <section id="s4">
+      <span class="step-tag">FOUNDATION</span>
+      <h2>4 · Activation: adding a bend</h2>
+      <p>Stack a million weighted sums and you still only get… a bigger weighted sum. A line of lines is still a line. To model curves, decisions, and language, each neuron passes its weighted sum through a small <b>non-linear</b> function called an <b>activation</b>:</p>
+      <div class="math">z = w₁x₁ + w₂x₂ + … + b      (the weighted sum)
+a = activation(z)             (the "bend")</div>
+      <p>Three you'll meet constantly:</p>
+      <ul>
+        <li><b>ReLU</b> — <code class="inline">max(0, z)</code>. Negative? Output 0. Positive? Pass it through. Cheap and dominant in modern nets.</li>
+        <li><b>Sigmoid</b> — squashes any number into <code class="inline">(0, 1)</code>. Good for "probability-like" outputs.</li>
+        <li><b>tanh</b> — squashes into <code class="inline">(-1, 1)</code>. (Remember this one — it's the exact function BinaryLLM uses to smoothly turn weights into +1/-1.)</li>
+      </ul>
+
+      <div class="card demo">
+        <p class="demo-title">Activation shapes</p>
+        <div class="flex">
+          <canvas id="a_canvas" width="440" height="300"></canvas>
+          <div>
+            <div class="controls">
+              <div class="ctrl"><label>function</label>
+                <select id="a_fn" style="grid-column: span 2; background:var(--panel-2); color:var(--text); border:1px solid var(--border); border-radius:6px; padding:6px;">
+                  <option value="relu">ReLU</option>
+                  <option value="sigmoid">Sigmoid</option>
+                  <option value="tanh">tanh</option>
+                </select>
+              </div>
+              <div class="ctrl"><label>input z</label><input id="a_z" type="range" min="-6" max="6" step="0.1" value="1.5"><output id="a_z_o">1.5</output></div>
+            </div>
+            <div class="readout" id="a_read"></div>
+            <p class="muted" style="margin-top:12px">Without this bend, deep networks would collapse into one big line. The activation is what lets stacked layers represent genuinely complex functions.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 5 ============ -->
+    <section id="s5">
+      <span class="step-tag">NETWORKS</span>
+      <h2>5 · A layer = a stack of neurons = a matrix</h2>
+      <p>One neuron gives one output number. A <b>layer</b> is just several neurons looking at the <i>same</i> inputs, each with its own weights. Say 3 inputs and 4 neurons:</p>
+      <div class="math">neuron 1:  y₁ = w₁₁x₁ + w₁₂x₂ + w₁₃x₃ + b₁
+neuron 2:  y₂ = w₂₁x₁ + w₂₂x₂ + w₂₃x₃ + b₂
+neuron 3:  y₃ = w₃₁x₁ + w₃₂x₂ + w₃₃x₃ + b₃
+neuron 4:  y₄ = w₄₁x₁ + w₄₂x₂ + w₄₃x₃ + b₄</div>
+      <p>Look at the weights: they form a grid — a row per neuron, a column per input. That grid is a <b>matrix</b> <code class="inline">W</code>. The whole layer collapses to one compact line:</p>
+      <div class="math">y = W·x + b</div>
+      <p>Here <code class="inline">W</code> is a 4×3 matrix (4 outputs, 3 inputs), <code class="inline">x</code> is a length-3 vector, <code class="inline">b</code> is a length-4 vector, and <code class="inline">y</code> is a length-4 vector. This is the exact same <code class="inline">y = wx + b</code> from Section 2 — just bundled. <b>This single equation is what "linear layer", "dense layer", "projection", and "fully-connected layer" all mean.</b></p>
+      <div class="note key">
+        A transformer's <code class="inline">q_proj, k_proj, v_proj, o_proj, gate_proj, up_proj, down_proj</code> are all exactly this: <code class="inline">y = W·x</code>. When a paper says "binarize the linear layers," it means "replace the numbers inside these <code class="inline">W</code> matrices with just +1/-1." Now you know what they're talking about.
+      </div>
+    </section>
+
+    <!-- ============ 6 ============ -->
+    <section id="s6">
+      <span class="step-tag">NETWORKS</span>
+      <h2>6 · Matrix × vector, made visual</h2>
+      <p>Matrix multiplication sounds scary; it's just "one dot product per output row." Each row of <code class="inline">W</code> pairs up with the input vector, multiplies element-by-element, and sums. Watch it happen row by row:</p>
+
+      <div class="card demo">
+        <p class="demo-title">Matrix–vector multiply (W · x)</p>
+        <div class="flex">
+          <div>
+            <canvas id="m_canvas" width="440" height="330"></canvas>
+          </div>
+          <div>
+            <p class="muted" style="margin-top:0">The highlighted row of <code class="inline">W</code> is being dotted with <code class="inline">x</code> to produce the highlighted output. This is the engine of every layer.</p>
+            <div style="margin:14px 0">
+              <button class="btn" id="m_step">Step ▶</button>
+              <button class="btn ghost" id="m_auto">Auto-play</button>
+              <button class="btn ghost" id="m_reset">Reset</button>
+            </div>
+            <div class="readout" id="m_read"></div>
+          </div>
+        </div>
+      </div>
+      <p>A layer with 1536 inputs and 1536 outputs (Iris's hidden size) is a 1536×1536 matrix — about 2.4 million weighted sums for a single token. Multiply that by dozens of layers and millions of tokens and you see why we care so much about shrinking those numbers.</p>
+    </section>
+
+    <!-- ============ 7 ============ -->
+    <section id="s7">
+      <span class="step-tag">NETWORKS</span>
+      <h2>7 · Stacking layers → a multi-layer network (MLP)</h2>
+      <p>Feed the output of one layer into the next. Between layers, apply an activation so the stack doesn't collapse into one line. That's a <b>multi-layer perceptron</b> — the classic feed-forward neural network:</p>
+      <div class="math">h₁ = activation(W₁·x  + b₁)     ← hidden layer 1
+h₂ = activation(W₂·h₁ + b₂)     ← hidden layer 2
+y  =            W₃·h₂ + b₃       ← output layer</div>
+      <p>"Feed-forward" just means information flows left to right, layer to layer, no loops. Watch a signal propagate through a small network — each edge is a weight, each node runs a weighted sum + activation:</p>
+
+      <div class="card demo">
+        <p class="demo-title">Forward pass through a 3-4-4-2 network</p>
+        <canvas id="mlp_canvas" width="820" height="340"></canvas>
+        <div style="margin-top:14px">
+          <button class="btn" id="mlp_pulse">Send a signal ▶</button>
+          <button class="btn ghost" id="mlp_rand">Randomise weights</button>
+        </div>
+        <p class="muted" id="mlp_read" style="margin-top:10px"></p>
+      </div>
+      <div class="note">
+        <b>Depth = abstraction.</b> Early layers detect simple patterns; later layers combine them into complex concepts. The same principle scales from 3 neurons to billions of parameters.
+      </div>
+    </section>
+
+    <!-- ============ 8 ============ -->
+    <section id="s8">
+      <span class="step-tag">NETWORKS</span>
+      <h2>8 · How the model learns (loss, gradients, backprop)</h2>
+      <p>So far the weights were random. <b>Training</b> is the process of nudging them until the output is right. Three moving parts:</p>
+      <ol>
+        <li><b>Loss</b> — a number measuring how wrong the prediction is. Bigger = worse. For a line, a common choice is squared error: <code class="inline">(prediction − target)²</code>.</li>
+        <li><b>Gradient</b> — for each weight, "if I increase this weight a tiny bit, does the loss go up or down, and how fast?" That's the slope of the loss with respect to that weight.</li>
+        <li><b>Gradient descent</b> — step every weight a little in the direction that <i>reduces</i> loss: <code class="inline">w ← w − learning_rate · gradient</code>. Repeat.</li>
+      </ol>
+      <p><b>Backpropagation</b> is just the efficient recipe (the chain rule from calculus) for computing all those gradients in one backward sweep, from the loss back through every layer. Watch gradient descent fit a line to noisy points — each click takes one step downhill:</p>
+
+      <div class="card demo">
+        <p class="demo-title">Gradient descent fitting a line</p>
+        <div class="flex">
+          <canvas id="gd_canvas" width="440" height="320"></canvas>
+          <div>
+            <div class="ctrl" style="grid-template-columns:130px 1fr 70px"><label>learning rate</label><input id="gd_lr" type="range" min="0.001" max="0.15" step="0.001" value="0.03"><output id="gd_lr_o">0.030</output></div>
+            <div style="margin:14px 0">
+              <button class="btn" id="gd_step">1 step ▼</button>
+              <button class="btn ghost" id="gd_10">10 steps</button>
+              <button class="btn ghost" id="gd_reset">Reset</button>
+            </div>
+            <div class="readout" id="gd_read"></div>
+            <p class="muted" style="margin-top:12px">Too small a learning rate → crawls. Too big → overshoots and diverges. Finding this balance is a core part of training real models.</p>
+          </div>
+        </div>
+      </div>
+      <div class="note key">
+        You now have the entire foundation: <b>weighted sums arranged as matrices, bent by activations, stacked into layers, and tuned by gradient descent.</b> Everything from here — including transformers — is built <i>only</i> from these pieces. The rest is clever wiring.
+      </div>
+    </section>
+
+    <!-- ============ 9 ============ -->
+    <section id="s9">
+      <span class="step-tag">TOWARD TRANSFORMERS</span>
+      <h2>9 · Language is a sequence — and order matters</h2>
+      <p>An MLP takes a fixed bag of numbers and produces an answer. But a sentence is a <b>sequence</b> of words, and each word's meaning depends on the others:</p>
+      <div class="card">
+        <p style="margin:0">"The animal didn't cross the street because <b>it</b> was too tired."</p>
+        <p class="muted" style="margin:6px 0 0">What does "it" refer to? To know, the model must let "it" <b>look at</b> the other words and decide which ones matter. That looking-and-weighing is <b>attention</b>.</p>
+      </div>
+      <p>The plan for the rest of the guide:</p>
+      <div class="math">1. Turn each word into a vector of numbers        (embeddings, §10)
+2. From each vector, build 3 new vectors: Q, K, V  (projections, §11)
+3. Every word scores every other word            (Q·K, §12)
+4. Turn scores into weights, blend the V's        (softmax, §13)
+5. Do it several ways at once                     (multi-head, §14)
+6. Tell the model word order                      (positions, §15)
+7. Add an MLP + wiring to finish the block        (§16)
+8. Stack the blocks                               (§17)</div>
+      <p>Notice steps 1–4 are <b>only</b> matrix multiplies and one softmax. You already know matrix multiplies.</p>
+    </section>
+
+    <!-- ============ 10 ============ -->
+    <section id="s10">
+      <span class="step-tag">TOWARD TRANSFORMERS</span>
+      <h2>10 · Embeddings — words become vectors</h2>
+      <p>Computers can't multiply the word "cat." So we assign every token (word or word-piece) a learnable vector of numbers — its <b>embedding</b>. The embedding table is one giant matrix: one row per vocabulary item.</p>
+      <div class="math">"cat"  → [ 0.21, -0.44,  0.90, ... ]   (length = hidden size, e.g. 1536)
+"dog"  → [ 0.19, -0.40,  0.85, ... ]
+"car"  → [-0.72,  0.11, -0.33, ... ]</div>
+      <p>Similar meanings end up as nearby vectors. In a real model the embedding table dominates the file size when the vocabulary is huge — Iris has 130,560 tokens × 1536 dims, which is why that one table is ~400M of the model's ~1B parameters.</p>
+      <div class="card demo">
+        <p class="demo-title">Word vectors in 2D (distance ≈ similarity)</p>
+        <div class="flex">
+          <canvas id="emb_canvas" width="440" height="320"></canvas>
+          <div>
+            <p class="muted" style="margin-top:0">These toy 2D embeddings cluster related words. Real embeddings live in hundreds or thousands of dimensions, but the intuition is identical: <b>direction and distance encode meaning</b>.</p>
+            <div class="readout" id="emb_read"></div>
+            <p class="muted" style="margin-top:10px">Hover a point to read its coordinates.</p>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 11 ============ -->
+    <section id="s11">
+      <span class="step-tag">TOWARD TRANSFORMERS · THE BIG ONE</span>
+      <h2>11 · Query, Key, Value — three projections</h2>
+      <p>Here is the idea people find mysterious, made concrete. From each word's embedding <code class="inline">x</code>, we create <b>three</b> new vectors by multiplying it through three different weight matrices — three linear layers exactly like Section 5:</p>
+      <div class="math">Q = W_q · x      ← the "Query"  : what am I looking for?
+K = W_k · x      ← the "Key"    : what do I offer/advertise?
+V = W_v · x      ← the "Value"  : what content do I carry?</div>
+      <p>A librarian analogy that actually maps onto the math:</p>
+      <div class="card">
+        <ul style="margin:0">
+          <li><b>Query</b> = your search request at the desk ("books about space").</li>
+          <li><b>Key</b> = the label on each book's spine (what it advertises itself as).</li>
+          <li><b>Value</b> = the actual contents inside the book.</li>
+        </ul>
+        <p class="muted" style="margin:10px 0 0">You match your <b>query</b> against every <b>key</b> to decide relevance, then you actually read the <b>values</b> of the books that matched — weighted by how well they matched.</p>
+      </div>
+      <p>The crucial point: <code class="inline">W_q, W_k, W_v</code> are just weight matrices, <b>learned by gradient descent</b> (Section 8). The model discovers on its own what makes a good query, key, and value. "Projection" simply means "multiply by a matrix to get a new vector" — nothing more.</p>
+
+      <div class="card demo">
+        <p class="demo-title">Project one word into Q, K, V</p>
+        <div class="flex">
+          <div>
+            <p class="muted" style="margin-top:0">Embedding <code class="inline">x</code> (2D toy). Drag to change the word's vector:</p>
+            <div class="controls">
+              <div class="ctrl"><label>x₁</label><input id="p_x1" type="range" min="-2" max="2" step="0.1" value="1.0"><output id="p_x1_o">1.0</output></div>
+              <div class="ctrl"><label>x₂</label><input id="p_x2" type="range" min="-2" max="2" step="0.1" value="0.6"><output id="p_x2_o">0.6</output></div>
+            </div>
+            <canvas id="p_canvas" width="440" height="260"></canvas>
+          </div>
+          <div>
+            <p class="muted" style="margin-top:0">Each of Q, K, V comes from its own fixed (here, preset) 2×2 weight matrix. Same input, three different linear transforms → three different vectors.</p>
+            <div class="readout" id="p_read"></div>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <!-- ============ 12 ============ -->
+    <section id="s12">
+      <span class="step-tag">TOWARD TRANSFORMERS</span>
+      <h2>12 · Attention scores — every word rates every word</h2>
+      <p>Now we measure relevance. Word <i>i</i> compares its <b>query</b> <code class="inline">Qᵢ</code> against word <i>j</i>'s <b>key</b> <code class="inline">Kⱼ</code> using — you guessed it — a <b>dot product</b> (Section 3). A big dot product means "these two are aligned; j is relevant to i."</p>
+      <div class="math">score(i, j) = Qᵢ · Kⱼ                 (a single number)
+scaled      = (Qᵢ · Kⱼ) / √d_k         (keep numbers from exploding)</div>
+      <p>Do this for every pair and you get a grid of scores — the <b>attention matrix</b>. Row <i>i</i> tells you how much word <i>i</i> wants to pull from each other word. The <code class="inline">√d_k</code> division just stops the dot products from getting so large that the next step (softmax) becomes too "spiky."</p>
+
+      <div class="card demo">
+        <p class="demo-title">Attention score grid for a short sentence</p>
+        <canvas id="sc_canvas" width="560" height="360"></canvas>
+        <p class="muted" id="sc_read" style="margin-top:10px">Brighter = higher score = "this word is paying more attention to that word." Hover a cell.</p>
+      </div>
+    </section>
+
+    <!-- ============ 13 ============ -->
+    <section id="s13">
+      <span class="step-tag">TOWARD TRANSFORMERS</span>
+      <h2>13 · Softmax → weights, then blend the Values</h2>
+      <p>Raw scores can be any size. <b>Softmax</b> turns each row of scores into positive weights that sum to 1 — a clean set of "attention percentages." It exponentiates each score and divides by the total:</p>
+      <div class="math">softmax(s)ⱼ = e^(sⱼ) / Σ e^(sₖ)      → weights that add up to 1.0</div>
+      <p>Then the new representation of word <i>i</i> is a <b>weighted sum of all the Value vectors</b>, using those attention weights. (Weighted sum again — the very first idea from Section 3.)</p>
+      <div class="math">output_i = Σⱼ  attention_weight(i,j) · Vⱼ</div>
+      <p>So each word rebuilds itself as a blend of the words it decided were relevant. That's the entire mechanism. Play with raw scores and watch softmax convert them into a blend:</p>
+
+      <div class="card demo">
+        <p class="demo-title">Softmax over 4 words + Value blending</p>
+        <div class="flex">
+          <div>
+            <p class="muted" style="margin-top:0">Raw scores for word "it" attending to 4 words:</p>
+            <div class="controls">
+              <div class="ctrl"><label>animal</label><input class="sm_in" data-i="0" type="range" min="-4" max="8" step="0.1" value="3.5"><output>3.5</output></div>
+              <div class="ctrl"><label>street</label><input class="sm_in" data-i="1" type="range" min="-4" max="8" step="0.1" value="0.5"><output>0.5</output></div>
+              <div class="ctrl"><label>because</label><input class="sm_in" data-i="2" type="range" min="-4" max="8" step="0.1" value="-1.0"><output>-1.0</output></div>
+              <div class="ctrl"><label>tired</label><input class="sm_in" data-i="3" type="range" min="-4" max="8" step="0.1" value="1.2"><output>1.2</output></div>
+            </div>
+          </div>
+          <div>
+            <canvas id="sm_canvas" width="440" height="260"></canvas>
+            <div class="readout" id="sm_read" style="margin-top:10px"></div>
+          </div>
+        </div>
+      </div>
+      <div class="note key">
+        Attention = <b>dot-product scores → softmax weights → weighted sum of Values.</b> Three ideas you already had (dot product, normalising, weighted sum) wired together. That is "self-attention."
+      </div>
+    </section>
+
+    <!-- ============ 14 ============ -->
+    <section id="s14">
+      <span class="step-tag">TOWARD TRANSFORMERS</span>
+      <h2>14 · Multi-head attention — several views at once</h2>
+      <p>One attention pattern can only capture one kind of relationship. Real language has many at once: grammar, subject-verb links, long-range references. So we run attention <b>several times in parallel</b>, each with its own <code class="inline">W_q, W_k, W_v</code> — these parallel copies are <b>heads</b>.</p>
+      <div class="math">head 1: attention with (W_q¹, W_k¹, W_v¹)   → focuses on, say, syntax
+head 2: attention with (W_q², W_k², W_v²)   → focuses on, say, references
+   ⋮
+concat all heads → multiply by W_o (output projection) → final result</div>
+      <p>Each head is cheaper (it works on a slice of the dimensions), they run independently, then their outputs are concatenated and mixed by one more linear layer <code class="inline">W_o</code>. Toggle heads and watch different attention patterns light up:</p>
+
+      <div class="card demo">
+        <p class="demo-title">Three attention heads on the same sentence</p>
+        <div style="margin-bottom:10px">
+          <button class="btn head-btn" data-h="0">Head 1: neighbours</button>
+          <button class="btn ghost head-btn" data-h="1">Head 2: subject link</button>
+          <button class="btn ghost head-btn" data-h="2">Head 3: broad</button>
+        </div>
+        <canvas id="mh_canvas" width="560" height="300"></canvas>
+        <p class="muted" id="mh_read" style="margin-top:10px"></p>
+      </div>
+    </section>
+
+    <!-- ============ 15 ============ -->
+    <section id="s15">
+      <span class="step-tag">TOWARD TRANSFORMERS</span>
+      <h2>15 · Positional encoding — telling the model about order</h2>
+      <p>Attention treats the input as a <b>set</b> — it has no built-in sense of "first word vs. last word." But "dog bites man" ≠ "man bites dog." So we add <b>position information</b> to each embedding before attention.</p>
+      <p>The original paper uses sine and cosine waves of different frequencies; each position gets a unique fingerprint that the model can read off:</p>
+      <div class="math">PE(pos, 2i)   = sin( pos / 10000^(2i/d) )
+PE(pos, 2i+1) = cos( pos / 10000^(2i/d) )
+input = embedding + PE          (just add them together)</div>
+      <p>Each column below is one position's encoding — a unique pattern of values the network learns to interpret as "where am I in the sentence."</p>
+      <div class="card demo">
+        <p class="demo-title">Positional encoding fingerprints</p>
+        <canvas id="pe_canvas" width="560" height="300"></canvas>
+        <p class="muted" style="margin-top:10px">Rows = dimensions (low = fast waves, high = slow waves). Columns = positions. Every column is distinct, so the model can always tell positions apart. Modern models often use rotary variants (RoPE), but the goal is the same.</p>
+      </div>
+    </section>
+
+    <!-- ============ 16 ============ -->
+    <section id="s16">
+      <span class="step-tag">TOWARD TRANSFORMERS</span>
+      <h2>16 · The feed-forward network & the transformer block</h2>
+      <p>After attention has let words share information, each word is passed <b>independently</b> through a small MLP (Section 7) to "think" about what it gathered. This is the <b>feed-forward network</b> (FFN): expand to a bigger hidden size, apply an activation, shrink back.</p>
+      <div class="math">FFN(x) = W_down · activation(W_up · x)     (two linear layers + a bend)</div>
+      <p>Two more pieces of wiring hold everything together and make deep stacks trainable:</p>
+      <ul>
+        <li><b>Residual connection</b> — add the input back to the output: <code class="inline">x + sublayer(x)</code>. Gives information a "shortcut" so gradients flow cleanly through many layers.</li>
+        <li><b>Layer normalization</b> — rescale each vector to a stable range so numbers don't blow up or vanish.</li>
+      </ul>
+      <p>Assemble it and you get one <b>transformer block</b>:</p>
+      <div class="math">x → LayerNorm → Multi-Head Attention → (+ x)  →
+    LayerNorm → Feed-Forward Network   → (+ x)  → out</div>
+      <div class="card demo">
+        <p class="demo-title">Anatomy of one transformer block</p>
+        <canvas id="blk_canvas" width="560" height="420"></canvas>
+        <p class="muted" style="margin-top:10px">The two "+" nodes are residual adds; each colored box is either attention or the FFN, wrapped in normalization. Every linear box inside is a <code class="inline">W·x</code> — the matrices a compression method like BinaryLLM targets.</p>
+      </div>
+    </section>
+
+    <!-- ============ 17 ============ -->
+    <section id="s17">
+      <span class="step-tag">THE WHOLE THING</span>
+      <h2>17 · The full architecture (Attention Is All You Need)</h2>
+      <p>Stack N identical transformer blocks, wrap them with embeddings at the bottom and a prediction head at the top, and you have a complete model:</p>
+      <div class="card demo">
+        <p class="demo-title">End-to-end: tokens in, next-word probabilities out</p>
+        <canvas id="full_canvas" width="600" height="520"></canvas>
+      </div>
+      <p>Reading it bottom-to-top, every stage is now something you understand:</p>
+      <ol>
+        <li><b>Tokenize</b> — split text into tokens (word-pieces).</li>
+        <li><b>Embed</b> (§10) — each token → a vector, via a lookup matrix.</li>
+        <li><b>Add positions</b> (§15) — inject word order.</li>
+        <li><b>N × transformer blocks</b> (§16) — each does multi-head attention (§11–14) + FFN, with residuals and norms.</li>
+        <li><b>Output head</b> — a final linear layer (§5) maps the top vector to a score for every vocabulary word.</li>
+        <li><b>Softmax</b> (§13) — turn those scores into probabilities; pick the next token.</li>
+      </ol>
+      <div class="note key">
+        <b>Zoom all the way out:</b> the entire model is <code class="inline">W·x + b</code> repeated in enormous grids, bent by activations, wired with attention and residuals, and tuned by gradient descent. The line you started with in Section 1 never left — there are just billions of them now, cooperating.
+      </div>
+      <div class="note">
+        <b>What comes next:</b> those billions of floats are expensive to store and multiply. Sections 18–25 show how BinaryLLM converts the linear-layer weights inside each block into <code class="inline">±1</code> — while keeping the architecture you just learned intact.
+      </div>
+    </section>
+
+    <!-- ============ 18 ============ -->
+    <section id="s18">
+      <span class="step-tag">BINARY WEIGHTS</span>
+      <h2>18 · Why compress? Memory and multiplies</h2>
+      <p>A 7B model in FP16 needs roughly <b>14 GB</b> just for weights. Most of that is the linear matrices you met in §11 and §16. If every weight becomes a single bit (±1), weight storage drops by about <b>16×</b> vs FP16 — and float multiplies become cheap add/subtract (or bit ops on hardware that supports them).</p>
+      <p>Embeddings and the final output head are usually left at higher precision (large, sensitive). The compression target is the <b>linear layers inside transformer blocks</b>.</p>
+      <div class="card demo">
+        <p class="demo-title">Same 8×8 weight matrix — two storage stories</p>
+        <canvas id="mem_canvas" width="560" height="220"></canvas>
+        <div class="readout" id="mem_read" style="margin-top:12px"></div>
+      </div>
+      <div class="note key">
+        Goal: keep the <b>same transformer</b> you built in §17, but store (and multiply with) binary weights for every <code class="inline">W</code> inside the blocks.
+      </div>
+    </section>
+
+    <!-- ============ 19 ============ -->
+    <section id="s19">
+      <span class="step-tag">BINARY WEIGHTS</span>
+      <h2>19 · What “1-bit” means: Sign and {−1, +1}</h2>
+      <p>Full-precision weights are continuous floats. <b>1-bit quantization</b> maps each weight to only two values:</p>
+      <div class="math">Sign(w) = +1  if w ≥ 0
+         = −1  if w &lt; 0</div>
+      <p>That alone loses magnitude — a weight of 0.01 and a weight of 3.7 both become +1. So real binary nets also keep a small <b>scale</b> (next sections). For now, poke a tiny weight grid and watch Sign snap every entry:</p>
+      <div class="card demo">
+        <p class="demo-title">Float weights → Sign → binary grid</p>
+        <div class="flex">
+          <div>
+            <canvas id="sign_canvas" width="440" height="280"></canvas>
+          </div>
+          <div>
+            <div class="controls">
+              <button class="btn" id="sign_snap">Apply Sign ▶</button>
+              <button class="btn ghost" id="sign_reset">Reset floats</button>
+            </div>
+            <div class="readout" id="sign_read"></div>
+          </div>
+        </div>
+      </div>
+      <div class="note">
+        Paper notation: <code class="inline">X_b = S_a × Sign(X)</code>. The scale <code class="inline">S_a</code> puts the size back; Sign only keeps the direction.
+      </div>
+    </section>
+
+    <!-- ============ 20 ============ -->
+    <section id="s20">
+      <span class="step-tag">BINARY WEIGHTS</span>
+      <h2>20 · Why Sign on day 0 destroys a pre-trained LLM</h2>
+      <p>Pre-trained weights are already at a good minimum — tiny changes matter. If you slam <code class="inline">Sign(W)</code> onto them at the <b>start</b> of training, you trash that distribution. The paper shows the initial loss jumps near <b>~10</b> — almost like training from scratch.</p>
+      <p>Higher bit-widths hurt less; ultra-low bit (1 / 1.58 / 2) is where the cliff appears. That is why “just Sign and fine-tune” is not enough for LLMs.</p>
+      <div class="card demo">
+        <p class="demo-title">Weight histogram + initial-loss spike</p>
+        <div class="controls" style="max-width:420px">
+          <div class="ctrl" style="grid-template-columns:140px 1fr 70px">
+            <label>quantize</label>
+            <input id="dest_mode" type="range" min="0" max="2" step="1" value="0">
+            <output id="dest_mode_o">FP</output>
+          </div>
+        </div>
+        <canvas id="dest_canvas" width="560" height="280"></canvas>
+        <div class="readout" id="dest_read" style="margin-top:12px"></div>
+      </div>
+      <div class="note warn">
+        <b>The problem to solve:</b> we need a path from full-precision <code class="inline">W</code> to ±1 that does <b>not</b> nuke the model on step one.
+      </div>
+    </section>
+
+    <!-- ============ 21 ============ -->
+    <section id="s21">
+      <span class="step-tag">BINARY WEIGHTS · THE BIG ONE</span>
+      <h2>21 · Progressive F(x, t) — soft morph into Sign</h2>
+      <p>BinaryLLM’s core idea: replace hard Sign during training with a smooth function that starts nearly <b>linear</b> and ends near <b>Sign</b>:</p>
+      <div class="math">F(x, t) = tanh(t · x) / tanh(t)
+
+lim t→0   F(x,t) ≈ x          (almost identity — keep pre-trained W)
+lim t→∞   F(x,t) ≈ Sign(x)    (fully binary)</div>
+      <p><code class="inline">t</code> is a schedule that grows during training. Crucially, the <b>same</b> <code class="inline">F</code> is used in forward <b>and</b> backward (consistent progressive training) — unlike older binary nets that Sign in forward and only soften the gradient.</p>
+      <div class="card demo">
+        <p class="demo-title">Drag t — watch F morph from identity toward Sign</p>
+        <div class="controls" style="max-width:480px">
+          <div class="ctrl" style="grid-template-columns:100px 1fr 80px">
+            <label>t</label>
+            <input id="prog_t" type="range" min="0.05" max="12" step="0.05" value="0.5">
+            <output id="prog_t_o">0.50</output>
+          </div>
+        </div>
+        <canvas id="prog_canvas" width="560" height="320"></canvas>
+        <div class="readout" id="prog_read" style="margin-top:12px"></div>
+      </div>
+      <div class="note key">
+        Training uses <code class="inline">W_b = S_a × F(W / S_a, t)</code>. At the end, swap <code class="inline">F</code> for <code class="inline">Sign</code> with almost no extra error — because <code class="inline">F</code> already looks like Sign.
+      </div>
+    </section>
+
+    <!-- ============ 22 ============ -->
+    <section id="s22">
+      <span class="step-tag">BINARY WEIGHTS</span>
+      <h2>22 · Putting magnitude back: scale S<sub>a</sub></h2>
+      <p>±1 alone has no size. The analytical scale that minimizes L2 error between <code class="inline">W</code> and a binary copy is the mean absolute value:</p>
+      <div class="math">S_a = (1/n) Σ |W_i|
+
+W_b = S_a × F(W / S_a, t)</div>
+      <p>Dividing by <code class="inline">S_a</code> before <code class="inline">F</code> keeps the progressive curve in a sensible range; multiplying back restores magnitude so the layer still produces outputs of the right scale.</p>
+      <div class="card demo">
+        <p class="demo-title">One weight row: floats → scale → reconstructed</p>
+        <div class="controls" style="max-width:480px">
+          <div class="ctrl" style="grid-template-columns:100px 1fr 80px">
+            <label>t</label>
+            <input id="sa_t" type="range" min="0.05" max="12" step="0.05" value="2">
+            <output id="sa_t_o">2.00</output>
+          </div>
+        </div>
+        <canvas id="sa_canvas" width="560" height="260"></canvas>
+        <div class="readout" id="sa_read" style="margin-top:12px"></div>
+      </div>
+    </section>
+
+    <!-- ============ 23 ============ -->
+    <section id="s23">
+      <span class="step-tag">BINARY WEIGHTS</span>
+      <h2>23 · Dual scaling: S<sub>a</sub> × S<sub>l</sub></h2>
+      <p>Even with progressive <code class="inline">F</code>, residual error remains. BinaryLLM keeps <b>two</b> scales:</p>
+      <ul>
+        <li><code class="inline">S_a</code> — fixed analytical scale (mean |W|) that keeps quantization error small at every step</li>
+        <li><code class="inline">S_l</code> — learnable, initialized to <b>1</b>, updated during training to recover accuracy</li>
+      </ul>
+      <div class="math">W_b = S_l × S_a × F(W / S_a, t)</div>
+      <p>Using only a learnable scale (and dropping the analytical one) hurts LLMs — the paper’s ablations show dual scaling wins. At inference the two merge: <code class="inline">S = S_l × S_a</code>.</p>
+      <div class="card demo">
+        <p class="demo-title">Toggle which scales are active</p>
+        <div style="margin-bottom:12px">
+          <button class="btn ghost scale-btn" data-mode="a">S_a only</button>
+          <button class="btn ghost scale-btn" data-mode="l">S_l only</button>
+          <button class="btn scale-btn" data-mode="both">S_a × S_l</button>
+        </div>
+        <canvas id="dual_canvas" width="560" height="240"></canvas>
+        <div class="readout" id="dual_read" style="margin-top:12px"></div>
+      </div>
+      <div class="note">
+        <b>Binary-aware initialization</b> (paper §3.3) is a short pre-search for channel scales that protect salient weights before progressive training starts — a warm-up so hard bits hurt less. The dual scales above are what you see every training step.
+      </div>
+    </section>
+
+    <!-- ============ 24 ============ -->
+    <section id="s24">
+      <span class="step-tag">BINARY WEIGHTS</span>
+      <h2>24 · Train with F · serve with Sign</h2>
+      <p>During training the model sees soft binary weights. For deployment you want pure ±1 and one merged scale — no <code class="inline">tanh</code> at runtime:</p>
+      <div class="math">train:      W_b = S_l × S_a × F(W / S_a, t)
+inference: W_b = S × Sign(W)     where S = S_l × S_a</div>
+      <p>Because <code class="inline">t</code> ends large, <code class="inline">F ≈ Sign</code>, so the swap is nearly free. Multiplies become additions of ± scaled activations.</p>
+      <div class="card demo">
+        <p class="demo-title">Training → freeze → inference</p>
+        <div class="controls" style="max-width:480px">
+          <div class="ctrl" style="grid-template-columns:120px 1fr 90px">
+            <label>phase</label>
+            <input id="phase_slider" type="range" min="0" max="2" step="1" value="0">
+            <output id="phase_o">train</output>
+          </div>
+        </div>
+        <canvas id="phase_canvas" width="560" height="220"></canvas>
+        <div class="readout" id="phase_read" style="margin-top:12px"></div>
+      </div>
+    </section>
+
+    <!-- ============ 25 ============ -->
+    <section id="s25">
+      <span class="step-tag">BINARY WEIGHTS · PUTTING IT TOGETHER</span>
+      <h2>25 · On your transformer block</h2>
+      <p>Map the paper onto the architecture from §16–17. Every orange “BiLinear” box is a <code class="inline">W·x</code> whose weights become ±1. Purple boxes stay full(er) precision.</p>
+      <div class="card demo">
+        <p class="demo-title">What BinaryLLM binarizes (and what it leaves alone)</p>
+        <canvas id="bin_blk_canvas" width="560" height="460"></canvas>
+        <div class="readout" id="bin_blk_read" style="margin-top:12px"></div>
+      </div>
+      <div class="note key">
+        <b>The whole story in one line:</b> start from a pre-trained LLM → soft-morph weights with <code class="inline">F(x,t)</code> → keep <code class="inline">S_a</code> and learn <code class="inline">S_l</code> → deploy as <code class="inline">S · Sign(W)</code> on every linear layer inside the blocks. Same transformer you already understand — just binary weights.
+      </div>
+      <footer>
+        Built as a self-contained, offline interactive explainer · visuals rendered live with vanilla JS &amp; canvas · transformer concepts follow <i>Vaswani et al., "Attention Is All You Need" (2017)</i> · 1-bit sections follow <i>Tu et al., "Rethinking 1-bit Optimization Leveraging Pre-trained Large Language Models" (BinaryLLM, ICML 2026)</i>.
+      </footer>
+    </section>
+  </main>
+</div>
+
+<script>
+"use strict";
+// ---------- shared helpers ----------
+const COL = {
+  bg:"#0b0f14", grid:"#1f2733", axis:"#4b5666", text:"#e6edf3", muted:"#9aa7b4",
+  accent:"#58a6ff", green:"#7ee787", warn:"#f0883e", pink:"#ff7b9c", purple:"#bc8cff"
+};
+const $ = id => document.getElementById(id);
+function clear(ctx,w,h){ ctx.fillStyle=COL.bg; ctx.fillRect(0,0,w,h); }
+function lerp(a,b,t){ return a+(b-a)*t; }
+function fmt(n,d=2){ return (n>=0?" ":"")+n.toFixed(d); }
+function heat(t){ // 0..1 -> dark blue to bright
+  t=Math.max(0,Math.min(1,t));
+  const r=Math.round(lerp(13,126,t)), g=Math.round(lerp(20,166,t)), b=Math.round(lerp(30,255,t));
+  return `rgb(${r},${g},${b})`;
+}
+
+// =================================================================
+// 1 · LINE  y = mx + c
+// =================================================================
+(function(){
+  const cv=$("l_canvas"), ctx=cv.getContext("2d");
+  const W=cv.width,H=cv.height, ox=W/2, oy=H/2, sc=32;
+  function toPx(x,y){ return [ox+x*sc, oy-y*sc]; }
+  function draw(){
+    const m=+$("l_m").value, c=+$("l_c").value;
+    $("l_m_o").textContent=m.toFixed(1); $("l_c_o").textContent=c.toFixed(1);
+    clear(ctx,W,H);
+    // grid
+    ctx.strokeStyle=COL.grid; ctx.lineWidth=1;
+    for(let gx=-6;gx<=6;gx++){ let[px]=toPx(gx,0); ctx.beginPath();ctx.moveTo(px,0);ctx.lineTo(px,H);ctx.stroke(); }
+    for(let gy=-4;gy<=4;gy++){ let[,py]=toPx(0,gy); ctx.beginPath();ctx.moveTo(0,py);ctx.lineTo(W,py);ctx.stroke(); }
+    // axes
+    ctx.strokeStyle=COL.axis; ctx.lineWidth=1.5;
+    ctx.beginPath();ctx.moveTo(0,oy);ctx.lineTo(W,oy);ctx.moveTo(ox,0);ctx.lineTo(ox,H);ctx.stroke();
+    // line
+    ctx.strokeStyle=COL.accent; ctx.lineWidth=3;
+    let [x0,y0]=toPx(-7, m*-7+c), [x1,y1]=toPx(7, m*7+c);
+    ctx.beginPath();ctx.moveTo(x0,y0);ctx.lineTo(x1,y1);ctx.stroke();
+    // intercept dot
+    let [ix,iy]=toPx(0,c); ctx.fillStyle=COL.pink; ctx.beginPath();ctx.arc(ix,iy,5,0,7);ctx.fill();
+    // sample point at x=2
+    let px2=2, py2=m*2+c, [sx,sy]=toPx(px2,py2);
+    ctx.fillStyle=COL.green; ctx.beginPath();ctx.arc(sx,sy,5,0,7);ctx.fill();
+    ctx.fillStyle=COL.muted; ctx.font="12px monospace";
+    ctx.fillText("x", W-14, oy-6); ctx.fillText("y", ox+6, 12);
+    $("l_read").innerHTML=`<span class="k">equation:</span> <span class="v">y = ${m.toFixed(1)}·x + ${c.toFixed(1)}</span><br>`+
+      `<span class="k">at x = 2:</span> <span class="v">y = ${m.toFixed(1)}×2 + ${c.toFixed(1)} = ${(m*2+c).toFixed(2)}</span> (green dot)<br>`+
+      `<span class="k">intercept:</span> <span class="v">line hits y = ${c.toFixed(1)} when x = 0</span> (pink dot)`;
+  }
+  ["l_m","l_c"].forEach(id=>$(id).addEventListener("input",draw)); draw();
+})();
+
+// =================================================================
+// 3 · NEURON with 3 inputs
+// =================================================================
+(function(){
+  const cv=$("n_canvas"), ctx=cv.getContext("2d"), W=cv.width,H=cv.height;
+  const ids=["n_x1","n_x2","n_x3","n_w1","n_w2","n_w3","n_b"];
+  function draw(){
+    const x=[+$("n_x1").value,+$("n_x2").value,+$("n_x3").value];
+    const w=[+$("n_w1").value,+$("n_w2").value,+$("n_w3").value];
+    const b=+$("n_b").value;
+    ids.forEach(id=>$(id+"_o").textContent=(+$(id).value).toFixed(1));
+    const terms=x.map((xi,i)=>xi*w[i]);
+    const z=terms[0]+terms[1]+terms[2]+b;
+    clear(ctx,W,H);
+    const inX=70, nX=300, outX=410, ys=[70,140,210];
+    // input nodes + edges
+    for(let i=0;i<3;i++){
+      const wgt=w[i];
+      ctx.strokeStyle = wgt>=0?COL.accent:COL.pink;
+      ctx.lineWidth=Math.max(1,Math.abs(wgt)*2.5);
+      ctx.beginPath();ctx.moveTo(inX+22,ys[i]);ctx.lineTo(nX-26,150);ctx.stroke();
+      ctx.fillStyle=COL.grid; ctx.beginPath();ctx.arc(inX,ys[i],20,0,7);ctx.fill();
+      ctx.fillStyle=COL.text; ctx.font="13px monospace"; ctx.textAlign="center";
+      ctx.fillText("x"+(i+1), inX, ys[i]-2); ctx.fillText(x[i].toFixed(1), inX, ys[i]+14);
+      ctx.fillStyle=(wgt>=0?COL.accent:COL.pink); ctx.font="11px monospace";
+      ctx.fillText("w="+wgt.toFixed(1), (inX+nX)/2, ys[i]+ (i-1)*18 - 6);
+    }
+    // neuron
+    ctx.fillStyle=COL.panel||"#1c2330"; ctx.fillStyle="#1c2330";
+    ctx.strokeStyle=COL.green; ctx.lineWidth=2;
+    ctx.beginPath();ctx.arc(nX,150,32,0,7);ctx.fill();ctx.stroke();
+    ctx.fillStyle=COL.green; ctx.font="12px monospace"; ctx.fillText("Σ + b", nX, 148); 
+    ctx.fillStyle=COL.text; ctx.fillText("="+z.toFixed(2), nX, 164);
+    // output
+    ctx.strokeStyle=COL.green; ctx.lineWidth=3; ctx.beginPath();ctx.moveTo(nX+32,150);ctx.lineTo(outX-22,150);ctx.stroke();
+    ctx.fillStyle=COL.green; ctx.beginPath();ctx.arc(outX,150,20,0,7);ctx.fill();
+    ctx.fillStyle="#04121f"; ctx.font="bold 13px monospace"; ctx.fillText("y", outX,148); ctx.fillText(z.toFixed(1), outX,163);
+    ctx.textAlign="left";
+    $("n_read").innerHTML=`<span class="k">y = w₁x₁ + w₂x₂ + w₃x₃ + b</span><br>`+
+      `<span class="v">y = (${w[0].toFixed(1)}×${x[0].toFixed(1)}) + (${w[1].toFixed(1)}×${x[1].toFixed(1)}) + (${w[2].toFixed(1)}×${x[2].toFixed(1)}) + ${b.toFixed(1)}</span><br>`+
+      `<span class="v">y = ${terms[0].toFixed(2)} + ${terms[1].toFixed(2)} + ${terms[2].toFixed(2)} + ${b.toFixed(1)} = ${z.toFixed(2)}</span>`;
+  }
+  ids.forEach(id=>$(id).addEventListener("input",draw)); draw();
+})();
+
+// =================================================================
+// 4 · ACTIVATIONS
+// =================================================================
+(function(){
+  const cv=$("a_canvas"), ctx=cv.getContext("2d"), W=cv.width,H=cv.height;
+  const ox=W/2, oy=H/2, sx=34, sy=90;
+  const fns={ relu:z=>Math.max(0,z), sigmoid:z=>1/(1+Math.exp(-z)), tanh:z=>Math.tanh(z) };
+  function draw(){
+    const name=$("a_fn").value, f=fns[name], z=+$("a_z").value;
+    $("a_z_o").textContent=z.toFixed(1);
+    clear(ctx,W,H);
+    ctx.strokeStyle=COL.grid; ctx.lineWidth=1;
+    for(let gx=-6;gx<=6;gx++){ctx.beginPath();ctx.moveTo(ox+gx*sx,0);ctx.lineTo(ox+gx*sx,H);ctx.stroke();}
+    for(let gy=-2;gy<=2;gy++){ctx.beginPath();ctx.moveTo(0,oy-gy*sy);ctx.lineTo(W,oy-gy*sy);ctx.stroke();}
+    ctx.strokeStyle=COL.axis; ctx.lineWidth=1.5;
+    ctx.beginPath();ctx.moveTo(0,oy);ctx.lineTo(W,oy);ctx.moveTo(ox,0);ctx.lineTo(ox,H);ctx.stroke();
+    ctx.strokeStyle=COL.accent; ctx.lineWidth=3; ctx.beginPath();
+    for(let px=0;px<W;px++){ const zz=(px-ox)/sx; const yy=f(zz); const py=oy-yy*sy;
+      if(px===0)ctx.moveTo(px,py);else ctx.lineTo(px,py); }
+    ctx.stroke();
+    const yv=f(z); const dotx=ox+z*sx, doty=oy-yv*sy;
+    ctx.strokeStyle=COL.muted; ctx.setLineDash([4,4]);
+    ctx.beginPath();ctx.moveTo(dotx,oy);ctx.lineTo(dotx,doty);ctx.lineTo(ox,doty);ctx.stroke();ctx.setLineDash([]);
+    ctx.fillStyle=COL.green; ctx.beginPath();ctx.arc(dotx,doty,6,0,7);ctx.fill();
+    ctx.fillStyle=COL.muted; ctx.font="12px monospace"; ctx.fillText("z",W-12,oy-6); ctx.fillText("a",ox+6,12);
+    $("a_read").innerHTML=`<span class="k">${name}(z)</span> with z = ${z.toFixed(1)}<br><span class="v">output a = ${yv.toFixed(3)}</span>`;
+  }
+  ["a_fn","a_z"].forEach(id=>$(id).addEventListener("input",draw)); draw();
+})();
+
+// =================================================================
+// 6 · MATRIX x VECTOR
+// =================================================================
+(function(){
+  const cv=$("m_canvas"), ctx=cv.getContext("2d"), W=cv.width,H=cv.height;
+  const Wm=[[0.5,-0.2,0.8],[ -0.4,0.9,0.1],[0.2,0.3,-0.7],[1.0,-0.5,0.4]];
+  const xv=[1.0,2.0,-1.0];
+  let row=-1, timer=null;
+  function out(r){ return Wm[r][0]*xv[0]+Wm[r][1]*xv[1]+Wm[r][2]*xv[2]; }
+  function draw(){
+    clear(ctx,W,H);
+    const cw=44, ch=40, mx=30, my=60;
+    ctx.font="13px monospace"; ctx.textAlign="center";
+    ctx.fillStyle=COL.muted; ctx.fillText("W (4×3)", mx+cw*1.5, 40);
+    // W matrix
+    for(let r=0;r<4;r++)for(let c=0;c<3;c++){
+      const x=mx+c*cw, y=my+r*ch;
+      ctx.fillStyle = (r===row)? "rgba(88,166,255,0.25)":"#11161e";
+      ctx.strokeStyle=(r===row)?COL.accent:COL.grid;
+      ctx.fillRect(x,y,cw-4,ch-4); ctx.strokeRect(x,y,cw-4,ch-4);
+      ctx.fillStyle=(r===row)?COL.accent:COL.text; ctx.fillText(Wm[r][c].toFixed(1),x+(cw-4)/2,y+ch/2);
+    }
+    // x vector
+    const vx=mx+3*cw+34;
+    ctx.fillStyle=COL.muted; ctx.fillText("x", vx+cw/2-2, 40);
+    for(let c=0;c<3;c++){
+      const y=my+c*ch;
+      ctx.fillStyle="#11161e"; ctx.strokeStyle=(row>=0)?COL.green:COL.grid;
+      ctx.fillRect(vx,y,cw-4,ch-4); ctx.strokeRect(vx,y,cw-4,ch-4);
+      ctx.fillStyle=COL.green; ctx.fillText(xv[c].toFixed(1),vx+(cw-4)/2,y+ch/2);
+    }
+    // output vector
+    const ox=vx+cw+50;
+    ctx.fillStyle=COL.muted; ctx.fillText("y = W·x", ox+cw/2+4, 40);
+    for(let r=0;r<4;r++){
+      const y=my+r*ch; const show=r<=row||row===3&&false;
+      ctx.fillStyle=(r===row)?"rgba(126,231,135,0.2)":"#11161e";
+      ctx.strokeStyle=(r===row)?COL.green:COL.grid; ctx.fillRect(ox,y,cw+6,ch-4); ctx.strokeRect(ox,y,cw+6,ch-4);
+      ctx.fillStyle=(r<=row)?COL.green:COL.muted;
+      ctx.fillText(r<=row?out(r).toFixed(2):"?", ox+(cw+6)/2, y+ch/2);
+    }
+    ctx.textAlign="left";
+    if(row>=0){
+      $("m_read").innerHTML=`<span class="k">row ${row+1} · x:</span><br><span class="v">`+
+        `(${Wm[row][0].toFixed(1)}×${xv[0].toFixed(1)}) + (${Wm[row][1].toFixed(1)}×${xv[1].toFixed(1)}) + (${Wm[row][2].toFixed(1)}×${xv[2].toFixed(1)})`+
+        ` = ${out(row).toFixed(2)}</span>`;
+    } else {
+      $("m_read").innerHTML=`<span class="k">Press Step to compute one output at a time.</span> Each output = one row of W dotted with x.`;
+    }
+  }
+  $("m_step").onclick=()=>{ row=(row+1)%4; draw(); };
+  $("m_reset").onclick=()=>{ row=-1; if(timer){clearInterval(timer);timer=null;} draw(); };
+  $("m_auto").onclick=()=>{ if(timer){clearInterval(timer);timer=null;return;} timer=setInterval(()=>{row=(row+1)%4;draw();},900); };
+  draw();
+})();
+
+// =================================================================
+// 7 · MLP forward pass
+// =================================================================
+(function(){
+  const cv=$("mlp_canvas"), ctx=cv.getContext("2d"), W=cv.width,H=cv.height;
+  const layers=[3,4,4,2];
+  let weights=[], pulse=0, anim=null;
+  function initW(){ weights=[]; for(let l=0;l<layers.length-1;l++){ let m=[]; for(let a=0;a<layers[l];a++){let row=[];for(let b=0;b<layers[l+1];b++)row.push(Math.random()*2-1);m.push(row);} weights.push(m);} }
+  function nodePos(l,i){ const x=60+l*(W-120)/(layers.length-1); const gap=H/(layers[l]+1); return [x,gap*(i+1)]; }
+  function draw(){
+    clear(ctx,W,H);
+    for(let l=0;l<layers.length-1;l++){
+      for(let a=0;a<layers[l];a++)for(let b=0;b<layers[l+1];b++){
+        const [x0,y0]=nodePos(l,a),[x1,y1]=nodePos(l+1,b); const w=weights[l][a][b];
+        const active = pulse> l+0.5;
+        ctx.strokeStyle= active ? (w>=0?"rgba(88,166,255,0.9)":"rgba(255,123,156,0.9)") : "rgba(80,90,105,0.35)";
+        ctx.lineWidth=active?Math.max(0.6,Math.abs(w)*2):0.7;
+        ctx.beginPath();ctx.moveTo(x0,y0);ctx.lineTo(x1,y1);ctx.stroke();
+      }
+    }
+    const names=["input","hidden","hidden","output"];
+    for(let l=0;l<layers.length;l++){
+      for(let i=0;i<layers[l];i++){ const[x,y]=nodePos(l,i);
+        const lit = pulse>=l;
+        ctx.fillStyle= lit ? (l===0?COL.green:l===layers.length-1?COL.warn:COL.accent) : "#232b38";
+        ctx.strokeStyle="#3a4453"; ctx.lineWidth=1.5;
+        ctx.beginPath();ctx.arc(x,y,15,0,7);ctx.fill();ctx.stroke();
+      }
+      const[lx]=nodePos(l,0); ctx.fillStyle=COL.muted; ctx.font="12px sans-serif"; ctx.textAlign="center";
+      ctx.fillText(names[l]+" ("+layers[l]+")", lx, H-14);
+    }
+    ctx.textAlign="left";
+  }
+  function sendPulse(){ if(anim)cancelAnimationFrame(anim); pulse=0; const t0=performance.now();
+    (function step(t){ pulse=(t-t0)/380; draw(); if(pulse<layers.length+0.5)anim=requestAnimationFrame(step); else {pulse=layers.length;draw();} })(t0);
+    $("mlp_read").textContent="Signal flows left→right: each node computes a weighted sum of the previous layer, applies an activation, and passes it on.";
+  }
+  $("mlp_pulse").onclick=sendPulse;
+  $("mlp_rand").onclick=()=>{initW();pulse=layers.length;draw();$("mlp_read").textContent="New random weights — every edge is one number the network would learn during training.";};
+  initW(); pulse=layers.length; draw();
+})();
+
+// =================================================================
+// 8 · GRADIENT DESCENT
+// =================================================================
+(function(){
+  const cv=$("gd_canvas"), ctx=cv.getContext("2d"), W=cv.width,H=cv.height;
+  const ox=40, oy=H-40, sx=36, sy=26;
+  // true line y=1.3x+0.5 with noise
+  const pts=[]; (function(){ for(let i=0;i<12;i++){ const x=(i-5)*0.8; const y=1.3*x+0.5+(Math.random()*2-1)*1.1; pts.push([x,y]); } })();
+  let w=-1.0,b=-2.0, steps=0;
+  function toPx(x,y){ return [ox+ (x+5)*sx, oy - (y+4)*sy]; }
+  function loss(){ let s=0; for(const[x,y]of pts){const p=w*x+b; s+=(p-y)**2;} return s/pts.length; }
+  function grad(){ let gw=0,gb=0; for(const[x,y]of pts){const p=w*x+b; gw+=2*(p-y)*x; gb+=2*(p-y);} return [gw/pts.length,gb/pts.length]; }
+  function draw(){
+    clear(ctx,W,H);
+    ctx.strokeStyle=COL.grid;ctx.lineWidth=1;
+    for(let gx=-5;gx<=6;gx++){let[px]=toPx(gx,-4);ctx.beginPath();ctx.moveTo(px,0);ctx.lineTo(px,H);ctx.stroke();}
+    ctx.strokeStyle=COL.axis;ctx.beginPath();ctx.moveTo(0,oy);ctx.lineTo(W,oy);ctx.stroke();
+    for(const[x,y]of pts){const[px,py]=toPx(x,y);ctx.fillStyle=COL.muted;ctx.beginPath();ctx.arc(px,py,4,0,7);ctx.fill();}
+    ctx.strokeStyle=COL.accent;ctx.lineWidth=3;
+    let[x0,y0]=toPx(-5,w*-5+b),[x1,y1]=toPx(6,w*6+b);
+    ctx.beginPath();ctx.moveTo(x0,y0);ctx.lineTo(x1,y1);ctx.stroke();
+    $("gd_read").innerHTML=`<span class="k">step:</span> <span class="v">${steps}</span>  `+
+      `<span class="k">w:</span> <span class="v">${w.toFixed(3)}</span> <span class="k">b:</span> <span class="v">${b.toFixed(3)}</span><br>`+
+      `<span class="k">loss (MSE):</span> <span class="v">${loss().toFixed(3)}</span>`;
+  }
+  function stepOnce(){ const lr=+$("gd_lr").value; const[gw,gb]=grad(); w-=lr*gw; b-=lr*gb; steps++; }
+  $("gd_lr").addEventListener("input",()=>$("gd_lr_o").textContent=(+$("gd_lr").value).toFixed(3));
+  $("gd_step").onclick=()=>{stepOnce();draw();};
+  $("gd_10").onclick=()=>{for(let i=0;i<10;i++)stepOnce();draw();};
+  $("gd_reset").onclick=()=>{w=-1.0;b=-2.0;steps=0;draw();};
+  draw();
+})();
+</script>
+
+<script>
+"use strict";
+const $t = id => document.getElementById(id);
+const TC = {
+  bg:"#0b0f14", grid:"#1f2733", axis:"#4b5666", text:"#e6edf3", muted:"#9aa7b4",
+  accent:"#58a6ff", green:"#7ee787", warn:"#f0883e", pink:"#ff7b9c", purple:"#bc8cff"
+};
+function clr(ctx,w,h){ ctx.fillStyle=TC.bg; ctx.fillRect(0,0,w,h); }
+function hcol(t){ t=Math.max(0,Math.min(1,t));
+  const r=Math.round(11+(t)*(115)), g=Math.round(15+t*151), b=Math.round(20+t*235);
+  return `rgb(${r},${g},${b})`; }
+
+// =================================================================
+// 10 · EMBEDDINGS 2D
+// =================================================================
+(function(){
+  const cv=$t("emb_canvas"), ctx=cv.getContext("2d"), W=cv.width,H=cv.height;
+  const words=[
+    ["cat",1.8,1.6,TC.green],["dog",2.1,1.2,TC.green],["kitten",1.5,2.0,TC.green],
+    ["car",-1.9,1.5,TC.accent],["truck",-2.2,1.0,TC.accent],["bus",-1.6,1.9,TC.accent],
+    ["happy",1.5,-1.8,TC.warn],["joy",1.9,-1.5,TC.warn],["sad",-1.7,-1.7,TC.pink]
+  ];
+  const ox=W/2,oy=H/2,sc=60;
+  function draw(hover){
+    clr(ctx,W,H);
+    ctx.strokeStyle=TC.grid;ctx.lineWidth=1;
+    for(let g=-3;g<=3;g++){ctx.beginPath();ctx.moveTo(ox+g*sc,0);ctx.lineTo(ox+g*sc,H);ctx.stroke();
+      ctx.beginPath();ctx.moveTo(0,oy+g*sc);ctx.lineTo(W,oy+g*sc);ctx.stroke();}
+    ctx.strokeStyle=TC.axis;ctx.beginPath();ctx.moveTo(0,oy);ctx.lineTo(W,oy);ctx.moveTo(ox,0);ctx.lineTo(ox,H);ctx.stroke();
+    words.forEach((wd,i)=>{ const px=ox+wd[1]*sc, py=oy-wd[2]*sc;
+      ctx.fillStyle=wd[3]; ctx.beginPath();ctx.arc(px,py,i===hover?8:5,0,7);ctx.fill();
+      ctx.fillStyle=TC.text;ctx.font="12px monospace";ctx.textAlign="center";ctx.fillText(wd[0],px,py-11);
+    });
+    ctx.textAlign="left";
+  }
+  cv.addEventListener("mousemove",e=>{ const r=cv.getBoundingClientRect();
+    const mx=(e.clientX-r.left)*(W/r.width), my=(e.clientY-r.top)*(H/r.height);
+    let hv=-1; words.forEach((wd,i)=>{const px=ox+wd[1]*sc,py=oy-wd[2]*sc; if(Math.hypot(px-mx,py-my)<12)hv=i;});
+    draw(hv);
+    if(hv>=0)$t("emb_read").innerHTML=`<span class="k">${words[hv][0]}</span> → <span class="v">[${words[hv][1].toFixed(2)}, ${words[hv][2].toFixed(2)}]</span><br><span class="muted">neighbours share meaning</span>`;
+  });
+  draw(-1);
+  $t("emb_read").innerHTML=`<span class="k">Clusters:</span> <span class="v">animals</span>, <span class="v">vehicles</span>, <span class="v">emotions</span>.`;
+})();
+
+// =================================================================
+// 11 · Q K V projection
+// =================================================================
+(function(){
+  const cv=$t("p_canvas"), ctx=cv.getContext("2d"), W=cv.width,H=cv.height;
+  const Wq=[[0.9,0.1],[-0.2,0.8]], Wk=[[0.3,-0.7],[0.6,0.4]], Wv=[[-0.5,0.5],[0.7,0.6]];
+  const ox=W/2,oy=H/2,sc=48;
+  function mv(M,v){ return [M[0][0]*v[0]+M[0][1]*v[1], M[1][0]*v[0]+M[1][1]*v[1]]; }
+  function arrow(v,col,lab){ const px=ox+v[0]*sc, py=oy-v[1]*sc;
+    ctx.strokeStyle=col;ctx.fillStyle=col;ctx.lineWidth=2.5;
+    ctx.beginPath();ctx.moveTo(ox,oy);ctx.lineTo(px,py);ctx.stroke();
+    const ang=Math.atan2(oy-py,px-ox);
+    ctx.beginPath();ctx.moveTo(px,py);
+    ctx.lineTo(px-9*Math.cos(ang-0.4),py+9*Math.sin(ang-0.4));
+    ctx.lineTo(px-9*Math.cos(ang+0.4),py+9*Math.sin(ang+0.4));ctx.closePath();ctx.fill();
+    ctx.font="12px monospace";ctx.fillText(lab,px+6,py); }
+  function draw(){
+    const x=[+$t("p_x1").value,+$t("p_x2").value];
+    $t("p_x1_o").textContent=x[0].toFixed(1);$t("p_x2_o").textContent=x[1].toFixed(1);
+    const q=mv(Wq,x),k=mv(Wk,x),v=mv(Wv,x);
+    clr(ctx,W,H);
+    ctx.strokeStyle=TC.grid;for(let g=-4;g<=4;g++){ctx.beginPath();ctx.moveTo(ox+g*sc,0);ctx.lineTo(ox+g*sc,H);ctx.stroke();ctx.beginPath();ctx.moveTo(0,oy+g*sc);ctx.lineTo(W,oy+g*sc);ctx.stroke();}
+    ctx.strokeStyle=TC.axis;ctx.beginPath();ctx.moveTo(0,oy);ctx.lineTo(W,oy);ctx.moveTo(ox,0);ctx.lineTo(ox,H);ctx.stroke();
+    arrow(x,TC.muted,"x"); arrow(q,TC.accent,"Q"); arrow(k,TC.green,"K"); arrow(v,TC.pink,"V");
+    $t("p_read").innerHTML=
+      `<span class="k">input x =</span> <span class="v">[${x[0].toFixed(1)}, ${x[1].toFixed(1)}]</span><br><br>`+
+      `<span style="color:${TC.accent}">Q = W_q·x = [${q[0].toFixed(2)}, ${q[1].toFixed(2)}]</span><br>`+
+      `<span style="color:${TC.green}">K = W_k·x = [${k[0].toFixed(2)}, ${k[1].toFixed(2)}]</span><br>`+
+      `<span style="color:${TC.pink}">V = W_v·x = [${v[0].toFixed(2)}, ${v[1].toFixed(2)}]</span>`;
+  }
+  ["p_x1","p_x2"].forEach(id=>$t(id).addEventListener("input",draw)); draw();
+})();
+
+// =================================================================
+// 12 · ATTENTION SCORE GRID
+// =================================================================
+const SENT=["The","animal","didn't","cross","because","it","was","tired"];
+(function(){
+  const cv=$t("sc_canvas"), ctx=cv.getContext("2d"), W=cv.width,H=cv.height;
+  const n=SENT.length;
+  // deterministic pseudo scores emphasising "it"->"animal"
+  const S=[];
+  for(let i=0;i<n;i++){S.push([]);for(let j=0;j<n;j++){
+    let v=Math.exp(-Math.abs(i-j)*0.5); // locality
+    if(SENT[i]==="it"&&SENT[j]==="animal")v+=1.4;
+    if(SENT[i]==="it"&&SENT[j]==="tired")v+=0.5;
+    S[i].push(v);
+  }}
+  const pad=70, cell=(W-pad-20)/n;
+  function draw(hr,hc){
+    clr(ctx,W,H);
+    ctx.font="11px monospace";ctx.textAlign="center";
+    for(let j=0;j<n;j++){ctx.save();ctx.translate(pad+j*cell+cell/2,pad-8);ctx.rotate(-0.5);ctx.fillStyle=TC.muted;ctx.fillText(SENT[j],0,0);ctx.restore();}
+    for(let i=0;i<n;i++){ctx.textAlign="right";ctx.fillStyle=TC.muted;ctx.fillText(SENT[i],pad-6,pad+i*cell+cell/2+4);ctx.textAlign="center";}
+    // normalise per row for display
+    for(let i=0;i<n;i++){ const mx=Math.max(...S[i]);
+      for(let j=0;j<n;j++){ const t=S[i][j]/mx; const x=pad+j*cell,y=pad+i*cell;
+        ctx.fillStyle=hcol(t); ctx.fillRect(x,y,cell-2,cell-2);
+        if(i===hr&&j===hc){ctx.strokeStyle=TC.warn;ctx.lineWidth=2;ctx.strokeRect(x,y,cell-2,cell-2);}
+      }}
+  }
+  cv.addEventListener("mousemove",e=>{const r=cv.getBoundingClientRect();
+    const mx=(e.clientX-r.left)*(W/r.width),my=(e.clientY-r.top)*(H/r.height);
+    const j=Math.floor((mx-pad)/cell), i=Math.floor((my-pad)/cell);
+    if(i>=0&&i<n&&j>=0&&j<n){draw(i,j);
+      $t("sc_read").innerHTML=`<b style="color:${TC.text}">${SENT[i]}</b> → <b style="color:${TC.text}">${SENT[j]}</b> · raw score <span style="color:${TC.green}">${S[i][j].toFixed(2)}</span>. Row = one word attending to all words.`;}
+  });
+  draw(5,1);
+})();
+
+// =================================================================
+// 13 · SOFTMAX + value blend
+// =================================================================
+(function(){
+  const cv=$t("sm_canvas"), ctx=cv.getContext("2d"), W=cv.width,H=cv.height;
+  const labels=["animal","street","because","tired"];
+  const inputs=[...document.querySelectorAll(".sm_in")];
+  function draw(){
+    const s=inputs.map(el=>+el.value);
+    inputs.forEach(el=>el.nextElementSibling.textContent=(+el.value).toFixed(1));
+    const ex=s.map(v=>Math.exp(v)); const sum=ex.reduce((a,b)=>a+b,0); const p=ex.map(v=>v/sum);
+    clr(ctx,W,H);
+    const bw=80, base=H-40, maxh=H-90;
+    ctx.font="12px monospace";ctx.textAlign="center";
+    p.forEach((pi,i)=>{ const x=25+i*(bw+12); const h=pi*maxh;
+      ctx.fillStyle=TC.accent; ctx.fillRect(x,base-h,bw,h);
+      ctx.fillStyle=TC.text; ctx.fillText((pi*100).toFixed(0)+"%",x+bw/2,base-h-8);
+      ctx.fillStyle=TC.muted; ctx.fillText(labels[i],x+bw/2,base+16);
+    });
+    ctx.strokeStyle=TC.axis;ctx.beginPath();ctx.moveTo(0,base);ctx.lineTo(W,base);ctx.stroke();
+    const top=p.indexOf(Math.max(...p));
+    $t("sm_read").innerHTML=`<span class="k">weights sum to</span> <span class="v">${p.reduce((a,b)=>a+b,0).toFixed(2)}</span>. `+
+      `Most attention on <b style="color:${TC.text}">${labels[top]}</b> (${(p[top]*100).toFixed(0)}%).<br>`+
+      `<span class="muted">new "it" = ${p.map((pi,i)=>pi.toFixed(2)+"·V("+labels[i]+")").join(" + ")}</span>`;
+  }
+  inputs.forEach(el=>el.addEventListener("input",draw)); draw();
+})();
+
+// =================================================================
+// 14 · MULTI-HEAD
+// =================================================================
+(function(){
+  const cv=$t("mh_canvas"), ctx=cv.getContext("2d"), W=cv.width,H=cv.height;
+  const n=SENT.length; const pad=70, cell=(W-pad-20)/n;
+  const descs=["neighbouring words (local context)","the pronoun 'it' locking onto its subject","a diffuse, whole-sentence view"];
+  function build(h){ const S=[]; for(let i=0;i<n;i++){S.push([]);for(let j=0;j<n;j++){let v;
+    if(h===0)v=Math.exp(-Math.abs(i-j)*0.9);
+    else if(h===1){v=0.1; if(SENT[i]==="it"&&SENT[j]==="animal")v=1.6; if(i===j)v=0.4;}
+    else v=0.5+0.5*Math.cos((i-j)*0.6);
+    S[i].push(v);} } return S; }
+  function draw(h){
+    const S=build(h); clr(ctx,W,H);
+    ctx.font="11px monospace";ctx.textAlign="center";
+    for(let j=0;j<n;j++){ctx.save();ctx.translate(pad+j*cell+cell/2,pad-8);ctx.rotate(-0.5);ctx.fillStyle=TC.muted;ctx.fillText(SENT[j],0,0);ctx.restore();}
+    for(let i=0;i<n;i++){ctx.textAlign="right";ctx.fillStyle=TC.muted;ctx.fillText(SENT[i],pad-6,pad+i*cell+cell/2+4);ctx.textAlign="center";}
+    for(let i=0;i<n;i++){const mx=Math.max(...S[i]);for(let j=0;j<n;j++){const t=S[i][j]/mx;
+      ctx.fillStyle=hcol(t);ctx.fillRect(pad+j*cell,pad+i*cell,cell-2,cell-2);}}
+    $t("mh_read").innerHTML=`<b style="color:${TC.text}">Head ${h+1}</b> attends to ${descs[h]}. Real models run many such heads at once, then combine them with W_o.`;
+  }
+  document.querySelectorAll(".head-btn").forEach(btn=>btn.onclick=()=>{
+    document.querySelectorAll(".head-btn").forEach(b=>b.classList.add("ghost"));
+    btn.classList.remove("ghost"); draw(+btn.dataset.h);
+  });
+  draw(0);
+})();
+
+// =================================================================
+// 15 · POSITIONAL ENCODING
+// =================================================================
+(function(){
+  const cv=$t("pe_canvas"), ctx=cv.getContext("2d"), W=cv.width,H=cv.height;
+  const dims=16, positions=24; const pad=50;
+  const cw=(W-pad-10)/positions, ch=(H-pad-10)/dims;
+  clr(ctx,W,H);
+  for(let d=0;d<dims;d++)for(let pos=0;pos<positions;pos++){
+    const i=Math.floor(d/2); const denom=Math.pow(10000,(2*i)/dims);
+    const v=(d%2===0)?Math.sin(pos/denom):Math.cos(pos/denom);
+    const t=(v+1)/2; ctx.fillStyle=hcol(t);
+    ctx.fillRect(pad+pos*cw, pad+d*ch, cw-1, ch-1);
+  }
+  ctx.fillStyle=TC.muted;ctx.font="11px monospace";ctx.textAlign="center";
+  ctx.fillText("position →", pad+positions*cw/2, H-14);
+  ctx.save();ctx.translate(16,pad+dims*ch/2);ctx.rotate(-Math.PI/2);ctx.fillText("dimension →",0,0);ctx.restore();
+})();
+
+// =================================================================
+// 16 · TRANSFORMER BLOCK
+// =================================================================
+(function(){
+  const cv=$t("blk_canvas"), ctx=cv.getContext("2d"), W=cv.width,H=cv.height;
+  clr(ctx,W,H);
+  function box(x,y,w,h,label,col,sub){
+    ctx.fillStyle=col;ctx.globalAlpha=0.18;ctx.fillRect(x,y,w,h);ctx.globalAlpha=1;
+    ctx.strokeStyle=col;ctx.lineWidth=2;ctx.strokeRect(x,y,w,h);
+    ctx.fillStyle=TC.text;ctx.font="bold 13px sans-serif";ctx.textAlign="center";
+    ctx.fillText(label,x+w/2,y+h/2+ (sub?-4:4));
+    if(sub){ctx.font="11px monospace";ctx.fillStyle=TC.muted;ctx.fillText(sub,x+w/2,y+h/2+13);}
+  }
+  function arr(x0,y0,x1,y1){ctx.strokeStyle=TC.axis;ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(x0,y0);ctx.lineTo(x1,y1);ctx.stroke();
+    ctx.fillStyle=TC.axis;ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x1-5,y1-9);ctx.lineTo(x1+5,y1-9);ctx.closePath();ctx.fill();}
+  const cx=W/2, bw=240, bx=cx-bw/2;
+  ctx.fillStyle=TC.muted;ctx.font="12px monospace";ctx.textAlign="center";ctx.fillText("input x",cx,H-16);
+  arr(cx,H-30,cx,H-52);
+  box(bx,H-100,bw,44,"LayerNorm",TC.purple);
+  arr(cx,H-100,cx,H-118);
+  box(bx,H-166,bw,44,"Multi-Head Attention",TC.accent,"Q,K,V,O = W·x");
+  arr(cx,H-166,cx,H-184);
+  // residual +
+  ctx.fillStyle=TC.green;ctx.beginPath();ctx.arc(cx,H-198,13,0,7);ctx.fill();ctx.fillStyle="#04121f";ctx.font="bold 15px monospace";ctx.fillText("+",cx,H-193);
+  // residual skip line
+  ctx.strokeStyle=TC.green;ctx.setLineDash([5,4]);ctx.lineWidth=1.5;
+  ctx.beginPath();ctx.moveTo(bx-8,H-78);ctx.lineTo(bx-30,H-78);ctx.lineTo(bx-30,H-198);ctx.lineTo(cx-13,H-198);ctx.stroke();ctx.setLineDash([]);
+  arr(cx,H-211,cx,H-232);
+  box(bx,H-278,bw,44,"LayerNorm",TC.purple);
+  arr(cx,H-278,cx,H-296);
+  box(bx,H-344,bw,44,"Feed-Forward Network",TC.warn,"W_down·act(W_up·x)");
+  arr(cx,H-344,cx,H-362);
+  ctx.fillStyle=TC.green;ctx.beginPath();ctx.arc(cx,H-376,13,0,7);ctx.fill();ctx.fillStyle="#04121f";ctx.font="bold 15px monospace";ctx.fillText("+",cx,H-371);
+  ctx.strokeStyle=TC.green;ctx.setLineDash([5,4]);ctx.lineWidth=1.5;
+  ctx.beginPath();ctx.moveTo(bx-8,H-256);ctx.lineTo(bx-30,H-256);ctx.lineTo(bx-30,H-376);ctx.lineTo(cx-13,H-376);ctx.stroke();ctx.setLineDash([]);
+  arr(cx,H-389,cx,H-410);
+  ctx.fillStyle=TC.muted;ctx.font="12px monospace";ctx.fillText("output (to next block)",cx,H-416);
+  ctx.fillStyle=TC.green;ctx.font="10px monospace";ctx.textAlign="left";ctx.fillText("dashed = residual skip",8,16);
+})();
+
+// =================================================================
+// 17 · FULL ARCHITECTURE
+// =================================================================
+(function(){
+  const cv=$t("full_canvas"), ctx=cv.getContext("2d"), W=cv.width,H=cv.height;
+  clr(ctx,W,H);
+  const cx=W/2, bw=300, bx=cx-bw/2;
+  function box(y,h,label,col,sub){
+    ctx.fillStyle=col;ctx.globalAlpha=0.18;ctx.fillRect(bx,y,bw,h);ctx.globalAlpha=1;
+    ctx.strokeStyle=col;ctx.lineWidth=2;ctx.strokeRect(bx,y,bw,h);
+    ctx.fillStyle=TC.text;ctx.font="bold 13px sans-serif";ctx.textAlign="center";
+    ctx.fillText(label,cx,y+h/2+(sub?-3:4));
+    if(sub){ctx.font="11px monospace";ctx.fillStyle=TC.muted;ctx.fillText(sub,cx,y+h/2+13);}
+  }
+  function arr(y0,y1){ctx.strokeStyle=TC.axis;ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(cx,y0);ctx.lineTo(cx,y1);ctx.stroke();
+    ctx.fillStyle=TC.axis;ctx.beginPath();ctx.moveTo(cx,y1);ctx.lineTo(cx-5,y1+9);ctx.lineTo(cx+5,y1+9);ctx.closePath();ctx.fill();}
+  let y=H-56;
+  ctx.fillStyle=TC.muted;ctx.font="12px monospace";ctx.textAlign="center";
+  ctx.fillText('"The cat sat" (text)', cx, H-20);
+  arr(H-34, y);
+  box(y-40,40,"Tokenize",TC.muted); y-=40; arr(y,y-16); y-=16;
+  box(y-44,44,"Embedding lookup",TC.green,"token → vector"); y-=44; arr(y,y-16); y-=16;
+  box(y-44,44,"+ Positional encoding",TC.purple,"inject order"); y-=44; arr(y,y-16); y-=16;
+  // stacked blocks
+  ctx.fillStyle=TC.accent;ctx.globalAlpha=0.10;ctx.fillRect(bx-10,y-104,bw+20,104);ctx.globalAlpha=1;
+  ctx.strokeStyle=TC.accent;ctx.setLineDash([4,3]);ctx.strokeRect(bx-10,y-104,bw+20,104);ctx.setLineDash([]);
+  box(y-44,44,"Transformer block",TC.accent,"attention + FFN + residual"); 
+  box(y-98,44,"Transformer block  × N",TC.accent,"stacked identical layers");
+  y-=104; arr(y,y-16); y-=16;
+  box(y-44,44,"Output head (linear)",TC.warn,"vector → vocab scores"); y-=44; arr(y,y-16); y-=16;
+  box(y-40,40,"Softmax → next token",TC.pink); y-=40;
+  ctx.fillStyle=TC.muted;ctx.font="12px monospace";ctx.fillText('P(next = "on") = 0.42 …', cx, y-14);
+})();
+
+// =================================================================
+// 18 · MEMORY COMPARISON
+// =================================================================
+(function(){
+  const cv=$t("mem_canvas"), ctx=cv.getContext("2d"), W=cv.width,H=cv.height;
+  const n=8, cells=n*n;
+  function draw(){
+    clr(ctx,W,H);
+    const left=40, right=W/2+20, top=36, cell=18;
+    ctx.fillStyle=TC.text;ctx.font="bold 13px sans-serif";ctx.textAlign="left";
+    ctx.fillText("FP16 weights", left, 22);
+    ctx.fillText("1-bit (±1) packed", right, 22);
+    for(let i=0;i<n;i++)for(let j=0;j<n;j++){
+      const v=(Math.sin(i*1.7+j*0.9)+Math.cos(j*1.3))*0.8;
+      const t=(v+1.6)/3.2;
+      ctx.fillStyle=hcol(Math.max(0,Math.min(1,t)));
+      ctx.fillRect(left+j*cell, top+i*cell, cell-2, cell-2);
+      const bit=v>=0?1:0;
+      ctx.fillStyle=bit?TC.green:TC.pink;
+      ctx.globalAlpha=0.85;
+      ctx.fillRect(right+j*cell, top+i*cell, cell-2, cell-2);
+      ctx.globalAlpha=1;
+    }
+    const fpBytes=cells*2, binBytes=Math.ceil(cells/8);
+    ctx.fillStyle=TC.muted;ctx.font="12px monospace";ctx.textAlign="left";
+    ctx.fillText(cells+" × 16 bits = "+fpBytes+" bytes", left, top+n*cell+28);
+    ctx.fillText(cells+" × 1 bit  = "+binBytes+" bytes", right, top+n*cell+28);
+    // bar
+    const barY=H-36, barW=W-80, bx=40;
+    ctx.fillStyle=TC.grid;ctx.fillRect(bx,barY,barW,14);
+    ctx.fillStyle=TC.warn;ctx.fillRect(bx,barY,barW,14);
+    ctx.fillStyle=TC.green;ctx.fillRect(bx,barY,barW*(binBytes/fpBytes),14);
+    ctx.fillStyle=TC.muted;ctx.font="11px monospace";
+    ctx.fillText("orange = FP16 footprint · green = 1-bit (~"+((fpBytes/binBytes).toFixed(0))+"× smaller here)", bx, barY-8);
+    $t("mem_read").innerHTML=
+      `<span class="k">toy 8×8:</span> <span class="v">${fpBytes} B → ${binBytes} B</span><br>`+
+      `<span class="k">same idea at LLM scale:</span> <span class="v">~16× less weight memory vs FP16</span> for every linear W you binarize.`;
+  }
+  draw();
+})();
+
+// =================================================================
+// 19 · SIGN GRID
+// =================================================================
+(function(){
+  const cv=$t("sign_canvas"), ctx=cv.getContext("2d"), W=cv.width,H=cv.height;
+  const rows=4, cols=6;
+  let mode="float"; // float | binary
+  let M=[];
+  function regen(){
+    M=[];
+    for(let i=0;i<rows;i++){M[i]=[];for(let j=0;j<cols;j++){
+      M[i][j]=+(Math.sin(i*2.1+j*1.4)*1.4+Math.cos(j*0.8)*0.6).toFixed(2);
+    }}
+  }
+  regen();
+  function draw(){
+    clr(ctx,W,H);
+    const pad=50, cw=(W-pad-20)/cols, ch=(H-pad-30)/rows;
+    ctx.fillStyle=TC.muted;ctx.font="11px monospace";ctx.textAlign="center";
+    ctx.fillText(mode==="float"?"full-precision W":"Sign(W) → ±1", W/2, 18);
+    for(let i=0;i<rows;i++)for(let j=0;j<cols;j++){
+      const v=M[i][j];
+      const show=mode==="float"?v:(v>=0?1:-1);
+      const t=mode==="float"?(v+2)/4:(show>0?1:0);
+      ctx.fillStyle=mode==="float"?hcol(Math.max(0,Math.min(1,t))):(show>0?TC.green:TC.pink);
+      const x=pad+j*cw, y=pad+i*ch;
+      ctx.globalAlpha=mode==="float"?0.9:0.85;
+      ctx.fillRect(x,y,cw-4,ch-4);ctx.globalAlpha=1;
+      ctx.fillStyle=TC.text;ctx.font="12px monospace";
+      ctx.fillText(mode==="float"?v.toFixed(2):(show>0?"+1":"−1"), x+cw/2-2, y+ch/2+4);
+    }
+    let err=0; for(let i=0;i<rows;i++)for(let j=0;j<cols;j++){
+      const b=M[i][j]>=0?1:-1; err+=Math.abs(M[i][j]-b);
+    }
+    err/=(rows*cols);
+    $t("sign_read").innerHTML=mode==="float"
+      ?`<span class="k">state:</span> <span class="v">floats</span><br><span class="k">click Sign</span> to snap every weight to ±1.`
+      :`<span class="k">state:</span> <span class="v">binary</span><br>`+
+       `<span class="k">mean |W − Sign(W)|:</span> <span class="v">${err.toFixed(3)}</span> — magnitude is gone until a scale multiplies back.`;
+  }
+  $t("sign_snap").onclick=()=>{mode="binary";draw();};
+  $t("sign_reset").onclick=()=>{mode="float";regen();draw();};
+  draw();
+})();
+
+// =================================================================
+// 20 · DESTRUCTION / INITIAL LOSS
+// =================================================================
+(function(){
+  const cv=$t("dest_canvas"), ctx=cv.getContext("2d"), W=cv.width,H=cv.height;
+  // synthetic weight samples
+  const weights=[];
+  for(let i=0;i<200;i++){
+    const u=Math.random()*2-1;
+    weights.push(u*0.9+Math.sin(i)*0.15);
+  }
+  const modes=["FP16","4-bit-ish","1-bit Sign"];
+  const losses=[2.1, 3.4, 10.2];
+  function quant(v,mode){
+    if(mode===0)return v;
+    if(mode===1){ const step=0.25; return Math.round(v/step)*step; }
+    return v>=0?1:-1;
+  }
+  function draw(){
+    const mode=+$t("dest_mode").value|0;
+    $t("dest_mode_o").textContent=modes[mode].split(" ")[0];
+    clr(ctx,W,H);
+    // histogram
+    const bins=24, counts=new Array(bins).fill(0);
+    const lo=-1.5, hi=1.5;
+    weights.forEach(w=>{
+      const q=quant(w,mode);
+      const idx=Math.max(0,Math.min(bins-1,Math.floor((q-lo)/(hi-lo)*bins)));
+      counts[idx]++;
+    });
+    const maxC=Math.max(...counts,1);
+    const hx=40, hy=20, hw=W-200, hh=H-60;
+    ctx.fillStyle=TC.muted;ctx.font="12px monospace";ctx.textAlign="left";
+    ctx.fillText("weight distribution after quantize", hx, 16);
+    for(let i=0;i<bins;i++){
+      const bh=(counts[i]/maxC)*(hh-20);
+      const x=hx+i*(hw/bins);
+      ctx.fillStyle=mode===2?(i<bins/2?TC.pink:TC.green):TC.accent;
+      ctx.fillRect(x, hy+hh-bh, hw/bins-2, bh);
+    }
+    // loss meter
+    const lx=W-140, ly=50;
+    ctx.fillStyle=TC.text;ctx.font="bold 12px sans-serif";ctx.textAlign="center";
+    ctx.fillText("initial loss", lx+40, ly);
+    ctx.fillStyle=TC.grid;ctx.fillRect(lx+25, ly+12, 30, 160);
+    const lh=Math.min(160, losses[mode]/11*160);
+    ctx.fillStyle=mode===2?TC.pink:TC.warn;
+    ctx.fillRect(lx+25, ly+12+160-lh, 30, lh);
+    ctx.fillStyle=TC.green;ctx.font="14px monospace";
+    ctx.fillText(losses[mode].toFixed(1), lx+40, ly+190);
+    $t("dest_read").innerHTML=
+      `<span class="k">mode:</span> <span class="v">${modes[mode]}</span><br>`+
+      (mode===2
+        ?`<span class="k">effect:</span> <span class="v">mass collapses to two spikes at ±1</span> — pre-trained structure gone; loss ≈ scratch.`
+        :`<span class="k">effect:</span> <span class="v">distribution still resembles the original</span> — milder initial shock.`);
+  }
+  $t("dest_mode").addEventListener("input",draw); draw();
+})();
+
+// =================================================================
+// 21 · PROGRESSIVE F(x,t)
+// =================================================================
+(function(){
+  const cv=$t("prog_canvas"), ctx=cv.getContext("2d"), W=cv.width,H=cv.height;
+  function F(x,t){ return Math.tanh(t*x)/Math.tanh(t); }
+  function Fp(x,t){ // dF/dx
+    const th=Math.tanh(t*x);
+    return t*(1-th*th)/Math.tanh(t);
+  }
+  function draw(){
+    const t=Math.max(0.05,+$t("prog_t").value);
+    $t("prog_t_o").textContent=t.toFixed(2);
+    clr(ctx,W,H);
+    const ox=W/2, oy=H/2, sx=W/2.6, sy=H/2.6;
+    // grid + axes
+    ctx.strokeStyle=TC.grid;ctx.lineWidth=1;
+    for(let g=-2;g<=2;g++){
+      ctx.beginPath();ctx.moveTo(ox+g*sx/2,20);ctx.lineTo(ox+g*sx/2,H-20);ctx.stroke();
+      ctx.beginPath();ctx.moveTo(40,oy-g*sy/2);ctx.lineTo(W-40,oy-g*sy/2);ctx.stroke();
+    }
+    ctx.strokeStyle=TC.axis;ctx.lineWidth=1.5;
+    ctx.beginPath();ctx.moveTo(40,oy);ctx.lineTo(W-40,oy);ctx.moveTo(ox,20);ctx.lineTo(ox,H-20);ctx.stroke();
+    // identity
+    ctx.strokeStyle=TC.muted;ctx.setLineDash([4,4]);ctx.lineWidth=1.5;
+    ctx.beginPath();ctx.moveTo(ox-sx,oy+sy);ctx.lineTo(ox+sx,oy-sy);ctx.stroke();ctx.setLineDash([]);
+    // Sign
+    ctx.strokeStyle=TC.pink;ctx.lineWidth=2;ctx.globalAlpha=0.5;
+    ctx.beginPath();ctx.moveTo(ox-sx,oy+sy*0.95);ctx.lineTo(ox,oy+sy*0.95);ctx.lineTo(ox,oy-sy*0.95);ctx.lineTo(ox+sx,oy-sy*0.95);ctx.stroke();
+    ctx.globalAlpha=1;
+    // F
+    ctx.strokeStyle=TC.accent;ctx.lineWidth=3;
+    ctx.beginPath();
+    for(let i=0;i<=200;i++){
+      const x=-2+i*(4/200);
+      const y=F(x,t);
+      const px=ox+x*(sx/2), py=oy-y*(sy/2);
+      if(i===0)ctx.moveTo(px,py); else ctx.lineTo(px,py);
+    }
+    ctx.stroke();
+    // F' faint
+    ctx.strokeStyle=TC.green;ctx.lineWidth=1.5;ctx.globalAlpha=0.7;
+    ctx.beginPath();
+    for(let i=0;i<=200;i++){
+      const x=-2+i*(4/200);
+      const y=Math.min(2.2,Fp(x,t));
+      const px=ox+x*(sx/2), py=oy-y*(sy/2.5);
+      if(i===0)ctx.moveTo(px,py); else ctx.lineTo(px,py);
+    }
+    ctx.stroke();ctx.globalAlpha=1;
+    ctx.fillStyle=TC.muted;ctx.font="11px monospace";ctx.textAlign="left";
+    ctx.fillText("dashed = identity · pink = Sign · blue = F · green = F′", 12, H-12);
+    const nearLin=t<0.8, nearSign=t>6;
+    $t("prog_read").innerHTML=
+      `<span class="k">F(x,t)=tanh(t·x)/tanh(t)</span> · <span class="v">t = ${t.toFixed(2)}</span><br>`+
+      (nearLin?`<span class="k">regime:</span> <span class="v">near-linear</span> — preserves pre-trained weights.`
+        :nearSign?`<span class="k">regime:</span> <span class="v">near-Sign</span> — ready to swap F → Sign at inference.`
+        :`<span class="k">regime:</span> <span class="v">transitioning</span> — soft binary, still differentiable.`);
+  }
+  $t("prog_t").addEventListener("input",draw); draw();
+})();
+
+// =================================================================
+// 22 · SCALE Sa
+// =================================================================
+(function(){
+  const cv=$t("sa_canvas"), ctx=cv.getContext("2d"), W=cv.width,H=cv.height;
+  const Wrow=[0.42,-1.1,0.08,2.3,-0.55,0.9,-1.8,0.3];
+  function F(x,t){ return Math.tanh(t*x)/Math.tanh(t); }
+  function draw(){
+    const t=Math.max(0.05,+$t("sa_t").value);
+    $t("sa_t_o").textContent=t.toFixed(2);
+    const Sa=Wrow.reduce((a,v)=>a+Math.abs(v),0)/Wrow.length;
+    const Wb=Wrow.map(w=>Sa*F(w/Sa,t));
+    clr(ctx,W,H);
+    const n=Wrow.length, pad=50, gap=(W-pad*2)/n;
+    function bars(arr,y0,col,label){
+      ctx.fillStyle=TC.muted;ctx.font="11px monospace";ctx.textAlign="left";ctx.fillText(label,12,y0-8);
+      const maxA=3;
+      for(let i=0;i<n;i++){
+        const v=arr[i], bh=Math.max(2,Math.abs(v)/maxA*50);
+        const x=pad+i*gap+gap*0.15, y=y0+(v>=0?-bh:0);
+        ctx.fillStyle=v>=0?col:TC.pink;
+        ctx.fillRect(x,y,gap*0.7,bh);
+      }
+    }
+    bars(Wrow,70,TC.accent,"W (floats)");
+    bars(Wb,170,TC.green,"W_b = S_a · F(W/S_a, t)");
+    // Sa marker
+    ctx.strokeStyle=TC.warn;ctx.setLineDash([3,3]);
+    const say=170-Sa/3*50;
+    ctx.beginPath();ctx.moveTo(pad,say);ctx.lineTo(W-pad,say);ctx.stroke();ctx.setLineDash([]);
+    ctx.fillStyle=TC.warn;ctx.font="11px monospace";ctx.fillText("S_a ≈ "+Sa.toFixed(2), W-pad-90, say-6);
+    const mse=Wrow.reduce((a,w,i)=>a+(w-Wb[i])*(w-Wb[i]),0)/n;
+    $t("sa_read").innerHTML=
+      `<span class="k">S_a = mean(|W|)</span> = <span class="v">${Sa.toFixed(3)}</span><br>`+
+      `<span class="k">MSE(W, W_b):</span> <span class="v">${mse.toFixed(3)}</span> · grows smaller as t → 0, more binary as t ↑.`;
+  }
+  $t("sa_t").addEventListener("input",draw); draw();
+})();
+
+// =================================================================
+// 23 · DUAL SCALING
+// =================================================================
+(function(){
+  const cv=$t("dual_canvas"), ctx=cv.getContext("2d"), W=cv.width,H=cv.height;
+  const Wrow=[0.42,-1.1,0.08,2.3,-0.55,0.9,-1.8,0.3];
+  const Sa=Wrow.reduce((a,v)=>a+Math.abs(v),0)/Wrow.length;
+  const Sl=1.15; // pretend learned
+  let mode="both";
+  function F(x,t){ return Math.tanh(t*x)/Math.tanh(t); }
+  function recon(){
+    const t=4;
+    if(mode==="a") return Wrow.map(w=>Sa*F(w/Sa,t));
+    if(mode==="l") return Wrow.map(w=>Sl*F(w,t)); // bad: no analytical Sa
+    return Wrow.map(w=>Sl*Sa*F(w/Sa,t));
+  }
+  function draw(){
+    const Wb=recon();
+    clr(ctx,W,H);
+    const n=Wrow.length, pad=50, gap=(W-pad*2)/n, maxA=3.5;
+    ctx.fillStyle=TC.muted;ctx.font="12px monospace";ctx.textAlign="left";
+    ctx.fillText("target W (outline) vs reconstructed W_b (fill)", 12, 18);
+    for(let i=0;i<n;i++){
+      const x=pad+i*gap+gap*0.2;
+      // target outline
+      const vt=Wrow[i], bht=Math.max(2,Math.abs(vt)/maxA*70);
+      ctx.strokeStyle=TC.muted;ctx.lineWidth=2;
+      ctx.strokeRect(x, 110+(vt>=0?-bht:0), gap*0.6, bht);
+      // recon
+      const vr=Wb[i], bhr=Math.max(2,Math.abs(vr)/maxA*70);
+      ctx.fillStyle=vr>=0?TC.green:TC.pink;ctx.globalAlpha=0.75;
+      ctx.fillRect(x, 110+(vr>=0?-bhr:0), gap*0.6, bhr);ctx.globalAlpha=1;
+    }
+    const mse=Wrow.reduce((a,w,i)=>a+(w-Wb[i])*(w-Wb[i]),0)/n;
+    const labels={a:"S_a only (analytical)",l:"S_l only (learnable, no S_a)",both:"S_a × S_l (paper)"};
+    $t("dual_read").innerHTML=
+      `<span class="k">mode:</span> <span class="v">${labels[mode]}</span><br>`+
+      `<span class="k">S_a</span>=${Sa.toFixed(2)} · <span class="k">S_l</span>=${Sl.toFixed(2)} · <span class="k">MSE</span>= <span class="v">${mse.toFixed(3)}</span>`+
+      (mode==="both"?" — best balance of error min + accuracy compensation.":mode==="l"?" — unstable without analytical S_a.":" — good error floor; S_l still helps accuracy.");
+  }
+  document.querySelectorAll(".scale-btn").forEach(btn=>{
+    btn.onclick=()=>{
+      mode=btn.dataset.mode;
+      document.querySelectorAll(".scale-btn").forEach(b=>b.classList.add("ghost"));
+      btn.classList.remove("ghost");
+      draw();
+    };
+  });
+  draw();
+})();
+
+// =================================================================
+// 24 · TRAIN VS SERVE
+// =================================================================
+(function(){
+  const cv=$t("phase_canvas"), ctx=cv.getContext("2d"), W=cv.width,H=cv.height;
+  const phases=["early train","late train","inference"];
+  function draw(){
+    const p=+$t("phase_slider").value|0;
+    $t("phase_o").textContent=p===0?"early":p===1?"late":"serve";
+    clr(ctx,W,H);
+    // timeline
+    const y=60, xs=[80,W/2,W-80];
+    ctx.strokeStyle=TC.axis;ctx.lineWidth=3;
+    ctx.beginPath();ctx.moveTo(xs[0],y);ctx.lineTo(xs[2],y);ctx.stroke();
+    phases.forEach((lab,i)=>{
+      const active=i===p;
+      ctx.fillStyle=active?TC.accent:TC.grid;
+      ctx.beginPath();ctx.arc(xs[i],y,active?12:8,0,7);ctx.fill();
+      ctx.fillStyle=active?TC.text:TC.muted;ctx.font=(active?"bold ":"")+"12px sans-serif";ctx.textAlign="center";
+      ctx.fillText(lab, xs[i], y+36);
+    });
+    // formula box
+    const formulas=[
+      "W_b = S_l · S_a · F(W/S_a, t≈0.3)   ← nearly linear",
+      "W_b = S_l · S_a · F(W/S_a, t≫1)   ← nearly Sign",
+      "W_b = S · Sign(W)   with  S = S_l · S_a"
+    ];
+    ctx.fillStyle=TC.panel||"#161b22";
+    ctx.fillStyle="#161b22";
+    ctx.fillRect(40,100,W-80,70);
+    ctx.strokeStyle=TC.border||"#2d3543";ctx.strokeRect(40,100,W-80,70);
+    ctx.fillStyle=TC.green;ctx.font="14px monospace";ctx.textAlign="left";
+    ctx.fillText(formulas[p], 56, 140);
+    const notes=[
+      "Preserve pre-trained distribution; train with soft weights.",
+      "Weights already almost binary; gradients still flow via F′.",
+      "Drop tanh. Pure ±1 + one scale. Multiplies → adds."
+    ];
+    $t("phase_read").innerHTML=`<span class="k">${phases[p]}:</span> <span class="v">${notes[p]}</span>`;
+  }
+  $t("phase_slider").addEventListener("input",draw); draw();
+})();
+
+// =================================================================
+// 25 · BINARIZED BLOCK MAP
+// =================================================================
+(function(){
+  const cv=$t("bin_blk_canvas"), ctx=cv.getContext("2d"), W=cv.width,H=cv.height;
+  function box(x,y,w,h,label,col,sub,bin){
+    ctx.fillStyle=col;ctx.globalAlpha=bin?0.28:0.12;ctx.fillRect(x,y,w,h);ctx.globalAlpha=1;
+    ctx.strokeStyle=col;ctx.lineWidth=bin?2.5:1.5;ctx.strokeRect(x,y,w,h);
+    if(bin){
+      ctx.fillStyle=TC.warn;ctx.font="9px monospace";ctx.textAlign="right";
+      ctx.fillText("1-bit", x+w-6, y+12);
+    }
+    ctx.fillStyle=TC.text;ctx.font="bold 12px sans-serif";ctx.textAlign="center";
+    ctx.fillText(label,x+w/2,y+h/2+(sub?-4:4));
+    if(sub){ctx.font="10px monospace";ctx.fillStyle=TC.muted;ctx.fillText(sub,x+w/2,y+h/2+12);}
+  }
+  function arr(x0,y0,x1,y1){
+    ctx.strokeStyle=TC.axis;ctx.lineWidth=2;ctx.beginPath();ctx.moveTo(x0,y0);ctx.lineTo(x1,y1);ctx.stroke();
+    ctx.fillStyle=TC.axis;ctx.beginPath();ctx.moveTo(x1,y1);ctx.lineTo(x1-5,y1-8);ctx.lineTo(x1+5,y1-8);ctx.closePath();ctx.fill();
+  }
+  clr(ctx,W,H);
+  const cx=W/2, bw=260, bx=cx-bw/2;
+  // top: embed (not binary)
+  box(bx, 20, bw, 36, "Embedding / LM head", TC.purple, "usually NOT 1-bit", false);
+  arr(cx,56,cx,72);
+  box(bx, 72, bw, 36, "LayerNorm", TC.purple, null, false);
+  arr(cx,108,cx,124);
+  box(bx, 124, bw, 52, "Multi-Head Attention", TC.accent, "W_q W_k W_v W_o", true);
+  arr(cx,176,cx,192);
+  ctx.fillStyle=TC.green;ctx.beginPath();ctx.arc(cx,206,11,0,7);ctx.fill();
+  ctx.fillStyle="#04121f";ctx.font="bold 14px monospace";ctx.textAlign="center";ctx.fillText("+",cx,210);
+  arr(cx,217,cx,232);
+  box(bx, 232, bw, 36, "LayerNorm", TC.purple, null, false);
+  arr(cx,268,cx,284);
+  box(bx, 284, bw, 52, "Feed-Forward (FFN)", TC.warn, "gate / up / down", true);
+  arr(cx,336,cx,352);
+  ctx.fillStyle=TC.green;ctx.beginPath();ctx.arc(cx,366,11,0,7);ctx.fill();
+  ctx.fillStyle="#04121f";ctx.font="bold 14px monospace";ctx.fillText("+",cx,370);
+  arr(cx,377,cx,392);
+  box(bx, 392, bw, 36, "→ next block (× N)", TC.muted, null, false);
+  // legend
+  ctx.fillStyle=TC.warn;ctx.fillRect(16,H-28,14,14);
+  ctx.fillStyle=TC.muted;ctx.font="11px monospace";ctx.textAlign="left";
+  ctx.fillText("orange highlight = BiLinear (binarized W)", 36, H-16);
+  $t("bin_blk_read").innerHTML=
+    `<span class="k">binarized:</span> <span class="v">Q, K, V, O + FFN linears</span> inside every block<br>`+
+    `<span class="k">left alone:</span> <span class="v">embeddings, output head, norms</span> — same story as the paper’s Figure 1.`;
+})();
+
+// =================================================================
+// Accessibility: give every control a programmatic label
+// =================================================================
+(function(){
+  document.querySelectorAll(".ctrl").forEach(ctrl=>{
+    const lbl=ctrl.querySelector("label");
+    const field=ctrl.querySelector("input,select");
+    if(lbl&&field&&!field.getAttribute("aria-label")) field.setAttribute("aria-label",lbl.textContent.trim());
+  });
+  document.querySelectorAll(".sm_in").forEach(el=>{
+    if(!el.getAttribute("aria-label")) el.setAttribute("aria-label","score for "+(el.previousElementSibling?el.previousElementSibling.textContent:"word"));
+  });
+})();
+
+// =================================================================
+// TOC scrollspy
+// =================================================================
+(function(){
+  const links=[...document.querySelectorAll("nav.toc a")];
+  const map={}; links.forEach(a=>{const id=a.getAttribute("href").slice(1);map[id]=a;});
+  const secs=[...document.querySelectorAll("section[id]")];
+  const obs=new IntersectionObserver(es=>{ es.forEach(e=>{ if(e.isIntersecting){
+    links.forEach(a=>a.classList.remove("active")); if(map[e.target.id])map[e.target.id].classList.add("active"); } }); },
+    {rootMargin:"-20% 0px -70% 0px"});
+  secs.forEach(s=>obs.observe(s));
+})();
+</script>
+</body>
+</html>

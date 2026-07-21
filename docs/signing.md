@@ -22,6 +22,31 @@ Latest local test:
 `AEA1` means the output is already in signed/package-formatted Shortcut form.
 It is the file to import onto iPhone.
 
+## Fastest reproducible path (local Cherri binary + build script)
+
+If the repo already contains the Linux Cherri binary at `tmp/cherri-bin/cherri`
+(v2.3.0), an agent can build + HubSign in one command from PowerShell in the
+repo root — the build script normalizes CRLF and injects `.env.local` keys into
+a throwaway copy for a personal build:
+
+```powershell
+wsl -- bash -lc "cd '/mnt/c/Users/affan/Fun Projects/siri' && chmod +x ./tmp/cherri-bin/cherri && CHERRI_BIN=./tmp/cherri-bin/cherri bash scripts/build-shortcuts.sh --hubsign --share=anyone"
+```
+
+Then mirror the conventional alias and verify the `AEA1` header:
+
+```powershell
+Copy-Item -LiteralPath "dist\Iris.shortcut" -Destination "dist\Iris.signed.shortcut" -Force
+```
+
+A `.env.local` build bakes in real keys and is **for your own device only** —
+never distribute it. For a placeholder (distributable) build, temporarily move
+`.env.local` aside first. Validate structure (no sign) with:
+
+```powershell
+wsl -- bash -lc "cd '/mnt/c/Users/affan/Fun Projects/siri' && CHERRI_BIN=./tmp/cherri-bin/cherri bash scripts/build-shortcuts.sh --skip-sign && python3 scripts/validate-shortcut.py dist/Iris_unsigned.shortcut"
+```
+
 ## Windows / WSL Build And Sign
 
 From PowerShell in the repo root:
